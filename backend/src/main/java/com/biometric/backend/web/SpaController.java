@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class SpaController {
 
     @GetMapping({"/login", "/signup", "/verify", "/enable-biometrics", "/dashboard", "/dashboard/devices",
-            "/dashboard/biometrics", "/signed-out"})
+            "/dashboard/biometrics", "/link-account", "/signed-out"})
     public String forward() {
         return "forward:/index.html";
     }

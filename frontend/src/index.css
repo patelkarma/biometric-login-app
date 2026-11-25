@@ -1098,6 +1098,95 @@ select.input {
   color: var(--muted);
 }
 
+/* ---------- Email & phone card (Overview) ---------- */
+.contacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--sage-2);
+}
+.contact-row > div {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.contact-row span:not(.device-row__icon):not(.verified) {
+  font-size: 13px;
+  color: var(--muted);
+}
+.contact-row--empty {
+  background: transparent;
+  border: 1.5px dashed var(--line-2);
+}
+.contact-row--empty .device-row__icon {
+  color: var(--muted);
+  background: var(--sage-2);
+}
+
+/* Add-contact form: explanation on the left, inputs on the right (stacked on phones) */
+.add-contact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  padding: 22px;
+  border: 1.5px solid var(--line-2);
+  border-radius: 18px;
+}
+.add-contact__intro {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.add-contact__intro h3 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.add-contact__intro .demo-banner {
+  margin: 4px 0 0;
+}
+.add-contact__action .field {
+  margin-bottom: 12px;
+}
+.add-contact__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* "Is this you?" */
+.verified--chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.link-match {
+  margin-bottom: 20px;
+}
+.link-match .device-row strong {
+  overflow-wrap: anywhere;
+}
+button.back {
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
 .page-loading {
   display: grid;
   place-items: center;
@@ -1221,6 +1310,20 @@ select.input {
   }
   .dash__head h1 {
     font-size: 24px;
+  }
+  .contacts,
+  .add-contact {
+    grid-template-columns: 1fr;
+  }
+  .add-contact {
+    gap: 16px;
+    padding: 16px;
+  }
+  .contact-row--empty {
+    flex-wrap: wrap;
+  }
+  .contact-row--empty .btn {
+    width: 100%;
   }
   .sidebar__logout {
     min-height: 44px;

@@ -15,7 +15,12 @@ import java.time.Instant;
 @NoArgsConstructor
 public class OtpCode {
 
-    public enum Purpose { SIGNUP, LOGIN }
+    /**
+     * SIGNUP / LOGIN: proving you own the email or phone you sign in with.
+     * CONTACT: a signed-in user adding a second email or phone to their account.
+     * LINK: proving you own an existing account, to join a new sign-up into it.
+     */
+    public enum Purpose { SIGNUP, LOGIN, CONTACT, LINK }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,6 +44,12 @@ public class OtpCode {
 
     @Column(nullable = false)
     private int attempts;
+
+    /**
+     * For CONTACT and LINK codes: the signed-in user who asked for the code.
+     * Only that user can redeem it, even though it was sent to a different email / phone.
+     */
+    private Long ownerUserId;
 
     /** Set when the code is used successfully, exhausted, or superseded by a newer code. */
     private Instant consumedAt;

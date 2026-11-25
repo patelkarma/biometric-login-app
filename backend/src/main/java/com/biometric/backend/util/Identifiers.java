@@ -51,6 +51,10 @@ public final class Identifiers {
         return identifier.startsWith("+");
     }
 
+    public static ContactType typeOf(String identifier) {
+        return isPhone(identifier) ? ContactType.PHONE : ContactType.EMAIL;
+    }
+
     /** "phone number" or "email", for user-facing messages. */
     public static String describe(String identifier) {
         return isPhone(identifier) ? "phone number" : "email";

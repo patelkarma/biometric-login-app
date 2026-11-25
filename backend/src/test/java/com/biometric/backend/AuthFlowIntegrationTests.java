@@ -213,6 +213,150 @@ class AuthFlowIntegrationTests {
         assertThat(signedIn).isEqualTo(1);
     }
 
+    // ------------------------------------------------------------------ email + phone on one account
+
+    @Test
+    void addPhoneToEmailAccountThenSignInWithEither(CapturedOutput log) throws Exception {
+        String email = "both" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
+        String phone = randomIndianMobile();
+        String token = signUpAndVerify(log, "Meera", "Shah", "1995-03-03", "EMAIL", email, "laptop");
+
+        Res start = post("/api/contacts/start", token, """
+                {"contactType":"PHONE","contact":"%s"}""".formatted(phone));
+        assertThat(start.status).isEqualTo(200);
+        Res added = post("/api/contacts/verify", token, """
+                {"contactType":"PHONE","contact":"%s","code":"%s"}""".formatted(phone, codeFromLog(log, phone)));
+        assertThat(added.status).isEqualTo(200);
+        assertThat(added.body.get("email").asString()).isEqualTo(email);
+        assertThat(added.body.get("phone").asString()).isEqualTo(phone);
+
+        // A second phone is refused: one email and one phone per account.
+        Res second = post("/api/contacts/start", token, """
+                {"contactType":"PHONE","contact":"%s"}""".formatted(randomIndianMobile()));
+        assertThat(second.body.get("code").asString()).isEqualTo("CONTACT_EXISTS");
+
+        // Signing in with the phone opens the SAME account and signs the laptop out (one device).
+        Res phoneLogin = loginWithCode(log, "PHONE", phone, "phone");
+        assertThat(phoneLogin.body.at("/user/email").asString()).isEqualTo(email);
+        assertThat(get("/api/session/heartbeat", token).body.get("code").asString()).isEqualTo("SESSION_REVOKED");
+    }
+
+    @Test
+    void contactOfAnotherAccountCannotBeAddedOrStolen(CapturedOutput log) throws Exception {
+        String phone = randomIndianMobile();
+        signUpAndVerify(log, "Asha", "Rao", "1990-01-01", "PHONE", phone, "a");
+        String other = signUpAndVerify(log, "Ravi", "Kumar", "1991-02-02", "EMAIL",
+                "ravi" + UUID.randomUUID().toString().substring(0, 6) + "@example.com", "b");
+
+        Res taken = post("/api/contacts/start", other, """
+                {"contactType":"PHONE","contact":"%s"}""".formatted(phone));
+        assertThat(taken.status).isEqualTo(409);
+        assertThat(taken.body.get("code").asString()).isEqualTo("CONTACT_IN_USE");
+
+        // A code someone else asked for cannot be redeemed by a different account.
+        String freePhone = randomIndianMobile();
+        String victim = signUpAndVerify(log, "Neha", "Gupta", "1993-03-03", "EMAIL",
+                "neha" + UUID.randomUUID().toString().substring(0, 6) + "@example.com", "c");
+        post("/api/contacts/start", victim, """
+                {"contactType":"PHONE","contact":"%s"}""".formatted(freePhone));
+        Res stolen = post("/api/contacts/verify", other, """
+                {"contactType":"PHONE","contact":"%s","code":"%s"}""".formatted(freePhone, codeFromLog(log, freePhone)));
+        assertThat(stolen.status).isEqualTo(400);
+    }
+
+    @Test
+    void sameDetailsSignUpIsOfferedLinkingAndLinksWithCodeFromExistingEmail(CapturedOutput log) throws Exception {
+        String email = "karma" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
+        String phone = randomIndianMobile();
+        String first = "Karma" + UUID.randomUUID().toString().substring(0, 4).replaceAll("\\d", "x");
+        signUpAndVerify(log, first, "Patel", "2002-05-10", "EMAIL", email, "laptop");
+        Long originalId = get("/api/me", loginWithCode(log, "EMAIL", email, "laptop").body.get("token").asString())
+                .body.at("/user/id").asLong();
+
+        // Same person signs up again with a phone (different letter case in the name).
+        post("/api/auth/signup", null, """
+                {"firstName":"%s","surname":"PATEL","dateOfBirth":"2002-05-10","contactType":"PHONE","contact":"%s"}"""
+                .formatted(first.toLowerCase(), phone));
+        Res verified = verifyCode(log, "PHONE", phone, "phone");
+        assertThat(verified.body.get("possibleDuplicate").asBoolean()).isTrue();
+        String newToken = verified.body.get("token").asString();
+
+        Res match = get("/api/link/match", newToken);
+        assertThat(match.body.get("maskedContact").asString()).contains("***@example.com").doesNotContain(email);
+
+        // A wrong code does not link.
+        Res wrong = post("/api/link/verify", newToken, """
+                {"code":"000000","deviceId":"phone"}""");
+        assertThat(wrong.status).isEqualTo(400);
+
+        assertThat(post("/api/link/start", newToken, "").status).isEqualTo(200);
+        Res linked = post("/api/link/verify", newToken, """
+                {"code":"%s","deviceId":"phone","deviceName":"Safari on iPhone"}""".formatted(codeFromLog(log, email)));
+        assertThat(linked.status).isEqualTo(200);
+        assertThat(linked.body.at("/user/id").asLong()).isEqualTo(originalId);
+        assertThat(linked.body.at("/user/phone").asString()).isEqualTo(phone);
+        assertThat(linked.body.at("/user/email").asString()).isEqualTo(email);
+
+        // The duplicate account is gone: its token no longer works, and the phone now opens the original account.
+        assertThat(get("/api/me", newToken).status).isEqualTo(401);
+        assertThat(loginWithCode(log, "PHONE", phone, "tablet").body.at("/user/id").asLong()).isEqualTo(originalId);
+    }
+
+    @Test
+    void differentPersonOrDifferentDetailsAreNotLinked(CapturedOutput log) throws Exception {
+        String surname = "Iyer" + UUID.randomUUID().toString().substring(0, 4).replaceAll("\\d", "y");
+        signUpAndVerify(log, "Kavya", surname, "1996-11-02", "EMAIL",
+                "kavya" + UUID.randomUUID().toString().substring(0, 6) + "@example.com", "a");
+
+        // Different date of birth -> no suggestion.
+        String phone1 = randomIndianMobile();
+        post("/api/auth/signup", null, """
+                {"firstName":"Kavya","surname":"%s","dateOfBirth":"1996-11-03","contactType":"PHONE","contact":"%s"}"""
+                .formatted(surname, phone1));
+        assertThat(verifyCode(log, "PHONE", phone1, "b").body.get("possibleDuplicate").asBoolean()).isFalse();
+
+        // Same details but the person says "not me": both accounts simply stay separate.
+        String phone2 = randomIndianMobile();
+        post("/api/auth/signup", null, """
+                {"firstName":"Kavya","surname":"%s","dateOfBirth":"1996-11-02","contactType":"PHONE","contact":"%s"}"""
+                .formatted(surname, phone2));
+        Res second = verifyCode(log, "PHONE", phone2, "c");
+        assertThat(second.body.get("possibleDuplicate").asBoolean()).isTrue();
+        assertThat(get("/api/me", second.body.get("token").asString()).status).isEqualTo(200);
+
+        // A normal later login never asks again.
+        assertThat(loginWithCode(log, "PHONE", phone2, "d").body.get("possibleDuplicate").asBoolean()).isFalse();
+    }
+
+    // ------------------------------------------------------------------ flow helpers
+
+    private String signUpAndVerify(CapturedOutput log, String first, String surname, String dob,
+                                   String type, String contact, String device) throws Exception {
+        Res signup = post("/api/auth/signup", null, """
+                {"firstName":"%s","surname":"%s","dateOfBirth":"%s","contactType":"%s","contact":"%s"}"""
+                .formatted(first, surname, dob, type, contact));
+        assertThat(signup.status).isEqualTo(201);
+        return verifyCode(log, type, contact, device).body.get("token").asString();
+    }
+
+    private Res verifyCode(CapturedOutput log, String type, String contact, String device) throws Exception {
+        Res res = post("/api/auth/otp/verify", null, """
+                {"contactType":"%s","contact":"%s","code":"%s","deviceId":"%s"}"""
+                .formatted(type, contact, codeFromLog(log, contact), device));
+        assertThat(res.status).as("verify %s -> %s", contact, res.body).isEqualTo(200);
+        return res;
+    }
+
+    private Res loginWithCode(CapturedOutput log, String type, String contact, String device) throws Exception {
+        assertThat(post("/api/auth/otp/request", null, """
+                {"contactType":"%s","contact":"%s"}""".formatted(type, contact)).status).isEqualTo(200);
+        return verifyCode(log, type, contact, device);
+    }
+
+    private static String randomIndianMobile() {
+        return "+919" + (100_000_000 + (int) (Math.random() * 899_999_999));
+    }
+
     // ------------------------------------------------------------------ log helper
 
     /** Reads the latest 6-digit code printed for this email / phone, exactly as a developer would. */

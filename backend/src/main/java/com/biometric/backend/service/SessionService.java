@@ -37,7 +37,7 @@ public class SessionService {
 
         /** The response body shared by code login and biometric login. */
         public LoginResponse toLoginResponse(User user, boolean hasPasskey) {
-            return new LoginResponse(token, UserDto.of(user), SessionDto.of(session), hasPasskey, replacedOtherDevice);
+            return new LoginResponse(token, UserDto.of(user), SessionDto.of(session), hasPasskey, replacedOtherDevice, false);
         }
     }
 
@@ -86,6 +86,15 @@ public class SessionService {
             if (Duration.between(s.getLastSeenAt(), Instant.now()).toSeconds() >= 60) {
                 s.setLastSeenAt(Instant.now());
             }
+        });
+    }
+
+    /** Ends every active session of a user (used when an account is merged into another). */
+    @Transactional
+    public void revokeAll(Long userId, DeviceSession.RevokeReason reason) {
+        sessions.findByUserIdAndRevokedAtIsNull(userId).forEach(s -> {
+            s.setRevokedAt(Instant.now());
+            s.setRevokeReason(reason);
         });
     }
 

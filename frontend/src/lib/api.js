@@ -60,7 +60,9 @@ export async function api(path, { method = 'GET', body } = {}) {
   if (!res.ok) {
     const code = data?.code ?? 'ERROR'
     const message = data?.message ?? `Request failed (${res.status})`
-    if (res.status === 401 && token && SESSION_END_CODES.has(code)) {
+    // Only react if this request used the CURRENT token: a slow request made with an old token
+    // (e.g. just before linking accounts or signing in again) must not sign the new session out.
+    if (res.status === 401 && token && token === getToken() && SESSION_END_CODES.has(code)) {
       onSessionEnded(code, message)
     }
     throw new ApiError(res.status, code, message)

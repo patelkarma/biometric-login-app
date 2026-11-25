@@ -1,28 +1,33 @@
 import { COUNTRY_CODES } from '../lib/contact'
 
-/** "Email | Phone" pill tabs plus the matching input. */
-export default function ContactInput({ value, onChange, autoFocus, label = 'Sign in with' }) {
+/**
+ * "Email | Phone" pill tabs plus the matching input.
+ * With `lockedType` ('EMAIL' or 'PHONE') the tabs are hidden and only that input is shown.
+ */
+export default function ContactInput({ value, onChange, autoFocus, label = 'Sign in with', lockedType }) {
   const set = (patch) => onChange({ ...value, ...patch })
 
   return (
     <div className="field">
-      <div className="pills" role="tablist" aria-label={label}>
-        {[
-          ['EMAIL', 'Email'],
-          ['PHONE', 'Phone'],
-        ].map(([type, text]) => (
-          <button
-            key={type}
-            type="button"
-            role="tab"
-            aria-selected={value.type === type}
-            className={`pill ${value.type === type ? 'is-active' : ''}`}
-            onClick={() => set({ type })}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
+      {!lockedType && (
+        <div className="pills" role="tablist" aria-label={label}>
+          {[
+            ['EMAIL', 'Email'],
+            ['PHONE', 'Phone'],
+          ].map(([type, text]) => (
+            <button
+              key={type}
+              type="button"
+              role="tab"
+              aria-selected={value.type === type}
+              className={`pill ${value.type === type ? 'is-active' : ''}`}
+              onClick={() => set({ type })}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      )}
 
       {value.type === 'EMAIL' ? (
         <>

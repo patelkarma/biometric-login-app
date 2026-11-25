@@ -3,7 +3,9 @@ package com.biometric.backend.web;
 import com.biometric.backend.dto.Dtos.*;
 import com.biometric.backend.model.DeviceSession;
 import com.biometric.backend.security.AuthUser;
+import com.biometric.backend.service.AccountLinkService;
 import com.biometric.backend.service.AccountService;
+import com.biometric.backend.service.ContactService;
 import com.biometric.backend.service.SessionService;
 import com.biometric.backend.webauthn.WebAuthnService;
 import jakarta.validation.Valid;
@@ -21,6 +23,8 @@ import java.util.Map;
 public class AccountController {
 
     private final AccountService accountService;
+    private final ContactService contactService;
+    private final AccountLinkService accountLinkService;
     private final SessionService sessionService;
     private final WebAuthnService webAuthnService;
 
@@ -56,5 +60,34 @@ public class AccountController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePasskey(@AuthenticationPrincipal AuthUser auth, @PathVariable Long id) {
         accountService.deletePasskey(auth.userId(), id);
+    }
+
+    // ---------- Add a second email / phone ----------
+
+    @PostMapping("/contacts/start")
+    public OtpSentResponse addContactStart(@AuthenticationPrincipal AuthUser auth, @Valid @RequestBody ContactRequest req) {
+        return contactService.start(auth.userId(), req);
+    }
+
+    @PostMapping("/contacts/verify")
+    public UserDto addContactVerify(@AuthenticationPrincipal AuthUser auth, @Valid @RequestBody ContactVerifyRequest req) {
+        return contactService.verify(auth.userId(), req);
+    }
+
+    // ---------- "Is this you?" account linking ----------
+
+    @GetMapping("/link/match")
+    public LinkMatchResponse linkMatch(@AuthenticationPrincipal AuthUser auth) {
+        return accountLinkService.match(auth.userId());
+    }
+
+    @PostMapping("/link/start")
+    public OtpSentResponse linkStart(@AuthenticationPrincipal AuthUser auth) {
+        return accountLinkService.start(auth.userId());
+    }
+
+    @PostMapping("/link/verify")
+    public LoginResponse linkVerify(@AuthenticationPrincipal AuthUser auth, @Valid @RequestBody LinkVerifyRequest req) {
+        return accountLinkService.verify(auth.userId(), req);
     }
 }

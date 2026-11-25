@@ -108,6 +108,12 @@ that registers a passkey and signs in with it, so the biometric flow is verified
 4. **One active device** — keep the dashboard open, then open an **Incognito window** (or another browser — each counts as a separate device) and sign in to the same account. Within ~5 seconds the first window switches to *"You've been signed out"*, naming the new device.
 5. **Sign up with email** — repeat step 1 using the *Email* tab.
 6. **Code rules** — enter a wrong code 5 times → the code is locked and a new one is required.
+7. **Email + phone on one account** — on the Overview, *Email & phone* → **+ Add phone** → enter the code from the
+   backend terminal. Log out and sign in with the phone: it opens the same account.
+8. **"Is this you?"** — sign up with an email, then sign up again with a *phone* using the same first name,
+   surname and date of birth. After verifying the phone you are asked whether the existing account
+   (shown masked, e.g. `ka***@example.com`) is yours. *Yes* → enter the code sent to that email → the two
+   accounts become one. *No* → you keep a separate account.
 
 > **No biometric hardware on your laptop?** Chrome/Edge offer *"Use a phone or tablet"* in the passkey dialog — scan the QR code with your phone and use its Face ID / fingerprint.
 > Chrome DevTools → ⋮ → *More tools* → *WebAuthn* can also emulate an authenticator.
@@ -138,6 +144,17 @@ counted in their own transaction so they can't be rolled back), resend cooldown,
 Biometric data never leaves the device and the server never sees it. Passkeys are *discoverable*, so users can tap
 **Sign in with Face ID / Fingerprint** without typing their email.
 
+### One person, one account (email + phone)
+- An account can have **one email and one phone**; each email / phone belongs to only one account.
+- *Add phone / Add email* (dashboard): a code is sent to the new contact; only after it is entered is the
+  contact attached. Codes for this are tied to the signed-in user, so nobody else can redeem them.
+- *"Is this you?"* (after sign-up): matching **first name + surname + date of birth** is only a *hint* -
+  different people can share them and anyone could type them - so it never logs anyone in or blocks a
+  sign-up. To join the accounts the user must also enter a code sent to the **existing** account's email /
+  phone. The masked contact is only shown to someone who has just verified their own new contact.
+- After linking, the new duplicate account is deleted and this device is signed in to the original account
+  (so "one active device" now covers both ways of signing in).
+
 ### One active device
 - Each browser gets a random `deviceId` (localStorage); each login creates a `device_sessions` row with a random
   256-bit token (only its SHA-256 hash is stored).
@@ -159,6 +176,9 @@ Biometric data never leaves the device and the server never sees it. Passkeys ar
 | POST | `/api/session/logout` | ✔ | end this session |
 | POST | `/api/passkeys/register/start` · `/finish` | ✔ | enable biometrics on this device |
 | DELETE | `/api/passkeys/{id}` | ✔ | remove a biometric login |
+| POST | `/api/contacts/start` · `/verify` | ✔ | add the missing email / phone (code sent to it) |
+| GET | `/api/link/match` | ✔ | "Is this you?" – the existing account (masked contact) |
+| POST | `/api/link/start` · `/verify` | ✔ | code to the existing account → merge into it |
 
 ---
 

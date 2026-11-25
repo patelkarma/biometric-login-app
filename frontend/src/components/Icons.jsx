@@ -39,6 +39,13 @@ export const FingerprintIcon = (p) => (
   </svg>
 )
 
+export const MailIcon = (p) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </svg>
+)
+
 export const PhoneIcon = (p) => (
   <svg {...base} {...p}>
     <rect x="6" y="2" width="12" height="20" rx="2.5" />

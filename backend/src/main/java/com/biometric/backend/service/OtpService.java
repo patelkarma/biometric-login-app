@@ -1,9 +1,11 @@
 package com.biometric.backend.service;
 
 import com.biometric.backend.config.AppProperties;
+import com.biometric.backend.dto.Dtos.OtpSentResponse;
 import com.biometric.backend.model.OtpCode;
 import com.biometric.backend.repository.OtpCodeRepository;
 import com.biometric.backend.util.Crypto;
+import com.biometric.backend.util.Identifiers;
 import com.biometric.backend.web.ApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,10 +27,31 @@ import java.time.Instant;
 public class OtpService {
 
     private final OtpCodeRepository repository;
+    private final NotificationService notifications;
     private final AppProperties properties;
 
+    /**
+     * Creates a code for `identifier`, delivers it (email or backend log) and describes
+     * the delivery for the client. Used by sign-up, login, adding a contact and linking.
+     *
+     * @param firstName    used to greet the user in the email
+     * @param ownerUserId  null for sign-up / login; the signed-in user for CONTACT and LINK codes
+     */
     @Transactional
-    public String issue(String identifier, OtpCode.Purpose purpose) {
+    public OtpSentResponse send(String identifier, String firstName, OtpCode.Purpose purpose, Long ownerUserId) {
+        String code = issue(identifier, purpose, ownerUserId);
+        NotificationService.Channel channel =
+                notifications.sendCode(Identifiers.typeOf(identifier), identifier, code, firstName);
+        return new OtpSentResponse(
+                Identifiers.typeOf(identifier),
+                identifier,
+                Identifiers.mask(identifier),
+                channel.name(),
+                ttlSeconds(),
+                resendCooldownSeconds());
+    }
+
+    private String issue(String identifier, OtpCode.Purpose purpose, Long ownerUserId) {
         repository.findFirstByIdentifierAndPurposeOrderByCreatedAtDesc(identifier, purpose).ifPresent(last -> {
             long elapsed = Duration.between(last.getCreatedAt(), Instant.now()).getSeconds();
             if (elapsed < resendCooldownSeconds()) {
@@ -45,6 +68,7 @@ public class OtpService {
         OtpCode otp = new OtpCode();
         otp.setIdentifier(identifier);
         otp.setPurpose(purpose);
+        otp.setOwnerUserId(ownerUserId);
         otp.setCodeHash(hash(identifier, code));
         otp.setExpiresAt(Instant.now().plusSeconds(ttlSeconds()));
         repository.save(otp);
@@ -57,8 +81,15 @@ public class OtpService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = ApiException.class)
     public void verify(String identifier, OtpCode.Purpose purpose, String code) {
+        verify(identifier, purpose, code, null);
+    }
+
+    /** As above, for CONTACT / LINK codes that only `ownerUserId` may redeem. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = ApiException.class)
+    public void verify(String identifier, OtpCode.Purpose purpose, String code, Long ownerUserId) {
         OtpCode otp = repository.findFirstByIdentifierAndPurposeOrderByCreatedAtDesc(identifier, purpose)
                 .filter(o -> o.getConsumedAt() == null)
+                .filter(o -> java.util.Objects.equals(o.getOwnerUserId(), ownerUserId))
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "CODE_INVALID",
                         "This code is no longer valid. Please request a new one."));
 

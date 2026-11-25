@@ -1,23 +1,24 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import ContactsCard from '../components/ContactsCard'
 import DeviceRow from '../components/DeviceRow'
 import { FaceIdIcon, FingerprintIcon } from '../components/Icons'
 import { Alert } from '../components/ui'
 import { useAuth } from '../context/useAuth'
-import { formatDob, formatPhone, formatTime } from '../lib/format'
+import { formatDob, formatTime } from '../lib/format'
 
 /** Overview: who is signed in, plus short summaries that link to the Devices and Biometrics pages. */
 export default function Dashboard() {
   const { me } = useAuth()
   const location = useLocation()
   const [banner, setBanner] = useState(() => {
+    if (location.state?.linked) return 'Accounts linked. You can now sign in with your email or your phone.'
     if (location.state?.biometricsEnabled) return 'Biometric sign-in is now enabled on this device.'
     if (location.state?.replacedOtherDevice) return 'You were signed out of your other device. Only this device is active now.'
     return null
   })
 
   const { user, session, passkeys } = me
-  const contact = user.email ?? formatPhone(user.phone)
   const method = session.loginMethod === 'BIOMETRIC' ? 'biometrics' : '6-digit code'
 
   return (
@@ -40,13 +41,14 @@ export default function Dashboard() {
           <div>
             <h1>Hi {user.firstName}, you&apos;re all set.</h1>
             <p>
-              {user.firstName} {user.surname} · Born {formatDob(user.dateOfBirth)} · {contact}{' '}
-              <span className="verified">verified</span>
+              {user.firstName} {user.surname} · Born {formatDob(user.dateOfBirth)}
             </p>
           </div>
         </div>
         <span className="badge">● Protected</span>
       </section>
+
+      <ContactsCard />
 
       <div className="dash__grid">
         <section className="tile">

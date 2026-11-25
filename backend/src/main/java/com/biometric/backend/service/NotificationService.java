@@ -1,6 +1,7 @@
 package com.biometric.backend.service;
 
 import com.biometric.backend.model.ContactType;
+import com.biometric.backend.util.Identifiers;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,14 +1,15 @@
-package com.biometric.backend.service;
+package com.biometric.backend.webauthn;
 
 import com.biometric.backend.dto.Dtos.LoginResponse;
 import com.biometric.backend.dto.Dtos.PasskeyDto;
 import com.biometric.backend.dto.Dtos.PasskeyOptionsResponse;
-import com.biometric.backend.dto.Dtos.SessionDto;
-import com.biometric.backend.dto.Dtos.UserDto;
 import com.biometric.backend.model.PasskeyCredential;
 import com.biometric.backend.model.User;
 import com.biometric.backend.repository.PasskeyCredentialRepository;
 import com.biometric.backend.repository.UserRepository;
+import com.biometric.backend.service.SessionService;
+import com.biometric.backend.util.Crypto;
+import com.biometric.backend.util.DeviceNames;
 import com.biometric.backend.web.ApiException;
 import com.yubico.webauthn.*;
 import com.yubico.webauthn.data.*;
@@ -63,7 +64,7 @@ public class WebAuthnService {
                         .user(UserIdentity.builder()
                                 .name(user.getIdentifier())
                                 .displayName(user.getFirstName() + " " + user.getSurname())
-                                .id(b64(user.getWebauthnUserHandle()))
+                                .id(JpaCredentialRepository.toByteArray(user.getWebauthnUserHandle()))
                                 .build())
                         .authenticatorSelection(AuthenticatorSelectionCriteria.builder()
                                 // discoverable credential -> "Sign in with Face ID" works without typing an email
@@ -97,8 +98,7 @@ public class WebAuthnService {
             passkey.setCredentialId(result.getKeyId().getId().getBase64Url());
             passkey.setPublicKeyCose(result.getPublicKeyCose().getBase64Url());
             passkey.setSignatureCount(result.getSignatureCount());
-            passkey.setDeviceName(deviceName == null || deviceName.isBlank() ? "This device"
-                    : deviceName.substring(0, Math.min(120, deviceName.length())));
+            passkey.setDeviceName(DeviceNames.clean(deviceName, "This device"));
             passkeys.save(passkey);
             log.info("User {} enabled biometric login on '{}'", user.getId(), passkey.getDeviceName());
             return PasskeyDto.of(passkey);
@@ -163,8 +163,8 @@ public class WebAuthnService {
             p.setLastUsedAt(Instant.now());
         });
 
-        SessionService.NewSession s = sessionService.startSession(user, deviceId, deviceName, "BIOMETRIC");
-        return new LoginResponse(s.token(), UserDto.of(user), SessionDto.of(s.session()), true, s.replacedOtherDevice());
+        return sessionService.startSession(user, deviceId, deviceName, "BIOMETRIC")
+                .toLoginResponse(user, true);
     }
 
     // ------------------------------------------------------------------ helpers
@@ -225,14 +225,6 @@ public class WebAuthnService {
             ext.set("credProps", c.path("clientExtensionResults").path("credProps"));
         }
         return out;
-    }
-
-    private static ByteArray b64(String value) {
-        try {
-            return ByteArray.fromBase64Url(value);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     private static Instant expiry() {

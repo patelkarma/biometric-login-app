@@ -1,4 +1,4 @@
-package com.biometric.backend.service;
+package com.biometric.backend.util;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

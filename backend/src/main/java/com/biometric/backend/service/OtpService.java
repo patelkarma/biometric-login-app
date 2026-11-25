@@ -1,10 +1,11 @@
 package com.biometric.backend.service;
 
+import com.biometric.backend.config.AppProperties;
 import com.biometric.backend.model.OtpCode;
 import com.biometric.backend.repository.OtpCodeRepository;
+import com.biometric.backend.util.Crypto;
 import com.biometric.backend.web.ApiException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -24,20 +25,14 @@ import java.time.Instant;
 public class OtpService {
 
     private final OtpCodeRepository repository;
-
-    @Value("${app.otp.ttl-seconds}")
-    private long ttlSeconds;
-    @Value("${app.otp.max-attempts}")
-    private int maxAttempts;
-    @Value("${app.otp.resend-cooldown-seconds}")
-    private long resendCooldownSeconds;
+    private final AppProperties properties;
 
     @Transactional
     public String issue(String identifier, OtpCode.Purpose purpose) {
         repository.findFirstByIdentifierAndPurposeOrderByCreatedAtDesc(identifier, purpose).ifPresent(last -> {
             long elapsed = Duration.between(last.getCreatedAt(), Instant.now()).getSeconds();
-            if (elapsed < resendCooldownSeconds) {
-                long wait = resendCooldownSeconds - elapsed;
+            if (elapsed < resendCooldownSeconds()) {
+                long wait = resendCooldownSeconds() - elapsed;
                 throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "RESEND_TOO_SOON",
                         "Please wait " + wait + " seconds before requesting a new code.");
             }
@@ -51,7 +46,7 @@ public class OtpService {
         otp.setIdentifier(identifier);
         otp.setPurpose(purpose);
         otp.setCodeHash(hash(identifier, code));
-        otp.setExpiresAt(Instant.now().plusSeconds(ttlSeconds));
+        otp.setExpiresAt(Instant.now().plusSeconds(ttlSeconds()));
         repository.save(otp);
         return code;
     }
@@ -75,7 +70,7 @@ public class OtpService {
 
         if (!Crypto.constantTimeEquals(otp.getCodeHash(), hash(identifier, code))) {
             otp.setAttempts(otp.getAttempts() + 1);
-            int left = maxAttempts - otp.getAttempts();
+            int left = properties.otp().maxAttempts() - otp.getAttempts();
             if (left <= 0) {
                 otp.setConsumedAt(Instant.now());
                 throw new ApiException(HttpStatus.BAD_REQUEST, "CODE_LOCKED",
@@ -89,11 +84,11 @@ public class OtpService {
     }
 
     public long ttlSeconds() {
-        return ttlSeconds;
+        return properties.otp().ttlSeconds();
     }
 
     public long resendCooldownSeconds() {
-        return resendCooldownSeconds;
+        return properties.otp().resendCooldownSeconds();
     }
 
     private static String hash(String identifier, String code) {

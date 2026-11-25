@@ -1,12 +1,17 @@
 package com.biometric.backend.service;
 
+import com.biometric.backend.config.AppProperties;
+import com.biometric.backend.dto.Dtos.LoginResponse;
+import com.biometric.backend.dto.Dtos.SessionDto;
+import com.biometric.backend.dto.Dtos.UserDto;
 import com.biometric.backend.model.DeviceSession;
 import com.biometric.backend.model.User;
 import com.biometric.backend.repository.DeviceSessionRepository;
 import com.biometric.backend.repository.UserRepository;
+import com.biometric.backend.util.Crypto;
+import com.biometric.backend.util.DeviceNames;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +24,7 @@ import java.util.Optional;
  *
  * Every successful login (6-digit code OR biometrics) goes through {@link #startSession}, which,
  * inside one transaction holding a lock on the user row, revokes every other active session
- * and then creates the new one. The old device's next request (or its 10-second heartbeat)
+ * and then creates the new one. The old device's next request (or its 5-second heartbeat)
  * is answered with 401 SESSION_REVOKED and the UI tells the user they were signed in elsewhere.
  */
 @Slf4j
@@ -27,19 +32,24 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SessionService {
 
-    public record NewSession(String token, DeviceSession session, boolean replacedOtherDevice) {}
+    /** Result of a login. The raw token exists only here; the database keeps its hash. */
+    public record NewSession(String token, DeviceSession session, boolean replacedOtherDevice) {
+
+        /** The response body shared by code login and biometric login. */
+        public LoginResponse toLoginResponse(User user, boolean hasPasskey) {
+            return new LoginResponse(token, UserDto.of(user), SessionDto.of(session), hasPasskey, replacedOtherDevice);
+        }
+    }
 
     private final DeviceSessionRepository sessions;
     private final UserRepository users;
-
-    @Value("${app.session.ttl-days}")
-    private long ttlDays;
+    private final AppProperties properties;
 
     @Transactional
     public NewSession startSession(User user, String deviceId, String deviceName, String loginMethod) {
         users.lockById(user.getId());
 
-        String safeDeviceName = sanitizeDeviceName(deviceName);
+        String safeDeviceName = DeviceNames.clean(deviceName, "Unknown device");
         boolean replacedOther = false;
         for (DeviceSession old : sessions.findByUserIdAndRevokedAtIsNull(user.getId())) {
             boolean sameDevice = old.getDeviceId().equals(deviceId);
@@ -59,7 +69,7 @@ public class SessionService {
         session.setDeviceId(deviceId == null || deviceId.isBlank() ? "unknown" : deviceId.substring(0, Math.min(64, deviceId.length())));
         session.setDeviceName(safeDeviceName);
         session.setLoginMethod(loginMethod);
-        session.setExpiresAt(Instant.now().plus(Duration.ofDays(ttlDays)));
+        session.setExpiresAt(Instant.now().plus(Duration.ofDays(properties.session().ttlDays())));
         sessions.save(session);
         return new NewSession(token, session, replacedOther);
     }
@@ -92,11 +102,5 @@ public class SessionService {
     @Transactional(readOnly = true)
     public DeviceSession get(Long sessionId) {
         return sessions.findById(sessionId).orElseThrow();
-    }
-
-    private static String sanitizeDeviceName(String name) {
-        if (name == null || name.isBlank()) return "Unknown device";
-        String clean = name.replaceAll("[\\p{Cntrl}<>]", "").trim();
-        return clean.length() > 120 ? clean.substring(0, 120) : clean;
     }
 }

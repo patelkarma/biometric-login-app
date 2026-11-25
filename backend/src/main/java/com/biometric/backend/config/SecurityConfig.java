@@ -4,7 +4,6 @@ import com.biometric.backend.dto.Dtos.ErrorResponse;
 import com.biometric.backend.security.TokenAuthFilter;
 import com.biometric.backend.service.SessionService;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -19,7 +18,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -50,9 +48,9 @@ public class SecurityConfig {
 
     /** Only used when the React dev server (port 5173) calls the API directly. */
     @Bean
-    CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.origins}") String origins) {
+    CorsConfigurationSource corsConfigurationSource(AppProperties properties) {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).toList());
+        config.setAllowedOrigins(properties.cors().origins());
         config.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

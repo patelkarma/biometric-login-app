@@ -5,6 +5,8 @@ import com.biometric.backend.model.OtpCode;
 import com.biometric.backend.model.User;
 import com.biometric.backend.repository.PasskeyCredentialRepository;
 import com.biometric.backend.repository.UserRepository;
+import com.biometric.backend.util.Crypto;
+import com.biometric.backend.util.Identifiers;
 import com.biometric.backend.web.ApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,12 +38,12 @@ public class AuthService {
         User user = users.findByIdentifier(identifier).orElse(null);
         if (user != null && user.isVerified()) {
             throw new ApiException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS",
-                    "An account with this " + (identifier.startsWith("+") ? "phone number" : "email") + " already exists. Please sign in.");
+                    "An account with this " + Identifiers.describe(identifier) + " already exists. Please sign in.");
         }
         if (user == null) {
             user = new User();
             user.setWebauthnUserHandle(Crypto.randomToken(32));
-            if (identifier.startsWith("+")) user.setPhone(identifier); else user.setEmail(identifier);
+            user.setIdentifier(identifier);
         }
         user.setFirstName(req.firstName().trim());
         user.setSurname(req.surname().trim());
@@ -57,7 +59,7 @@ public class AuthService {
         String identifier = Identifiers.normalize(req.contactType(), req.contact());
         User user = users.findByIdentifier(identifier)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND",
-                        "No account found with this " + (identifier.startsWith("+") ? "phone number" : "email") + ". Please sign up first."));
+                        "No account found with this " + Identifiers.describe(identifier) + ". Please sign up first."));
         return sendCode(user, purposeFor(user));
     }
 
@@ -71,9 +73,9 @@ public class AuthService {
         otpService.verify(identifier, purposeFor(user), req.code());
 
         user.setVerified(true);
-        SessionService.NewSession s = sessionService.startSession(user, req.deviceId(), req.deviceName(), "CODE");
         boolean hasPasskey = !passkeys.findByUserIdOrderByCreatedAtDesc(user.getId()).isEmpty();
-        return new LoginResponse(s.token(), UserDto.of(user), SessionDto.of(s.session()), hasPasskey, s.replacedOtherDevice());
+        return sessionService.startSession(user, req.deviceId(), req.deviceName(), "CODE")
+                .toLoginResponse(user, hasPasskey);
     }
 
     private OtpSentResponse sendCode(User user, OtpCode.Purpose purpose) {

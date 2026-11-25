@@ -1,4 +1,4 @@
-package com.biometric.backend.service;
+package com.biometric.backend.webauthn;
 
 import com.biometric.backend.model.PasskeyCredential;
 import com.biometric.backend.model.User;
@@ -30,14 +30,14 @@ public class JpaCredentialRepository implements CredentialRepository {
     public Set<PublicKeyCredentialDescriptor> getCredentialIdsForUsername(String username) {
         return users.findByIdentifier(username)
                 .map(u -> passkeys.findByUserIdOrderByCreatedAtDesc(u.getId()).stream()
-                        .map(p -> PublicKeyCredentialDescriptor.builder().id(fromB64(p.getCredentialId())).build())
+                        .map(p -> PublicKeyCredentialDescriptor.builder().id(toByteArray(p.getCredentialId())).build())
                         .collect(Collectors.toSet()))
                 .orElse(Set.of());
     }
 
     @Override
     public Optional<ByteArray> getUserHandleForUsername(String username) {
-        return users.findByIdentifier(username).map(u -> fromB64(u.getWebauthnUserHandle()));
+        return users.findByIdentifier(username).map(u -> toByteArray(u.getWebauthnUserHandle()));
     }
 
     @Override
@@ -63,18 +63,22 @@ public class JpaCredentialRepository implements CredentialRepository {
 
     private static RegisteredCredential toRegistered(PasskeyCredential p, User u) {
         return RegisteredCredential.builder()
-                .credentialId(fromB64(p.getCredentialId()))
-                .userHandle(fromB64(u.getWebauthnUserHandle()))
-                .publicKeyCose(fromB64(p.getPublicKeyCose()))
+                .credentialId(toByteArray(p.getCredentialId()))
+                .userHandle(toByteArray(u.getWebauthnUserHandle()))
+                .publicKeyCose(toByteArray(p.getPublicKeyCose()))
                 .signatureCount(p.getSignatureCount())
                 .build();
     }
 
-    private static ByteArray fromB64(String b64) {
+    /**
+     * We store WebAuthn binary values (ids, keys, user handles) as base64url text;
+     * this turns them back into Yubico's ByteArray. Shared with WebAuthnService.
+     */
+    static ByteArray toByteArray(String base64Url) {
         try {
-            return ByteArray.fromBase64Url(b64);
+            return ByteArray.fromBase64Url(base64Url);
         } catch (Exception e) {
-            throw new IllegalStateException("Corrupt base64url value in database", e);
+            throw new IllegalStateException("Corrupt base64url value", e);
         }
     }
 }

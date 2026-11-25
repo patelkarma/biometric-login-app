@@ -1,6 +1,7 @@
 package com.biometric.backend.repository;
 
 import com.biometric.backend.model.User;
+import com.biometric.backend.util.Identifiers;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -22,8 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("select u from User u where u.id = :id")
     Optional<User> lockById(@Param("id") Long id);
 
-    /** Normalised identifiers: phone numbers always start with '+', emails never do. */
+    /** Finds a user by a normalised email or phone number (see {@link Identifiers#normalize}). */
     default Optional<User> findByIdentifier(String identifier) {
-        return identifier.startsWith("+") ? findByPhone(identifier) : findByEmail(identifier);
+        return Identifiers.isPhone(identifier) ? findByPhone(identifier) : findByEmail(identifier);
     }
 }

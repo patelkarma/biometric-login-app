@@ -1,4 +1,4 @@
-package com.biometric.backend.service;
+package com.biometric.backend.util;
 
 import com.biometric.backend.model.ContactType;
 import com.biometric.backend.web.ApiException;
@@ -46,9 +46,19 @@ public final class Identifiers {
         return phone;
     }
 
+    /** Normalised phone numbers always start with '+', emails never do. */
+    public static boolean isPhone(String identifier) {
+        return identifier.startsWith("+");
+    }
+
+    /** "phone number" or "email", for user-facing messages. */
+    public static String describe(String identifier) {
+        return isPhone(identifier) ? "phone number" : "email";
+    }
+
     /** Masks an identifier for display: "jo***@gmail.com" or "+91 ******3210". */
     public static String mask(String identifier) {
-        if (identifier.startsWith("+")) {
+        if (isPhone(identifier)) {
             String last4 = identifier.substring(identifier.length() - 4);
             String cc = identifier.startsWith("+91") ? "+91 " : "";
             return cc + "******" + last4;

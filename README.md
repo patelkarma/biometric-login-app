@@ -155,18 +155,32 @@ Biometric data never leaves the device and the server never sees it. Passkeys ar
 ## Project structure
 
 ```
-backend/   Spring Boot API
-  config/       SecurityConfig (stateless bearer auth, CORS), WebAuthnConfig
-  model/        User, OtpCode, DeviceSession, PasskeyCredential
-  service/      AuthService, OtpService, NotificationService, SessionService, WebAuthnService
-  security/     TokenAuthFilter
-  web/          AuthController, AccountController, GlobalExceptionHandler, SpaController
-frontend/  React app
-  pages/        Login, SignUp, VerifyCode, EnableBiometrics, Dashboard, SignedOut
-  context/      AuthContext (token, profile, heartbeat)
-  lib/          api.js, biometrics.js (WebAuthn), device.js, contact.js
+backend/src/main/java/com/biometric/backend/
+  web/          HTTP only: AuthController, AccountController, GlobalExceptionHandler, SpaController
+  service/      business rules: AuthService (sign-up, code login), OtpService (6-digit codes),
+                SessionService (one active device), AccountService (profile, biometric list),
+                NotificationService (email / demo delivery)
+  webauthn/     Face ID / fingerprint: WebAuthnService + JpaCredentialRepository (Yubico <-> database)
+  repository/   database access (Spring Data JPA)
+  model/        database entities: User, OtpCode, DeviceSession, PasskeyCredential
+  dto/          request / response bodies of the API
+  security/     TokenAuthFilter (bearer token -> signed-in user), AuthUser
+  config/       AppProperties (all app.* settings), SecurityConfig, WebAuthnConfig
+  util/         Crypto (hashing, random tokens), Identifiers (email/phone rules), DeviceNames
+
+frontend/src/
+  pages/        the six screens: Login, SignUp, VerifyCode, EnableBiometrics, Dashboard, SignedOut
+  components/   shared UI: AuthLayout, Logo, ContactInput, Icons, ui.jsx (Alert, Button, TextField)
+  hooks/        useAsyncAction (busy / error state for API calls)
+  context/      AuthContext (token, profile, heartbeat, sign-out on another device)
+  lib/          api.js (all HTTP calls), biometrics.js (WebAuthn), validation.js, format.js,
+                contact.js, device.js, pendingOtp.js
+
 run.bat / run.sh   build + start everything on http://localhost:8080
 ```
+
+Request flow: `page → lib/api.js → web/*Controller → service/* → repository/* → H2`.
+Each layer only calls the one below it.
 
 ## Security notes & trade-offs
 

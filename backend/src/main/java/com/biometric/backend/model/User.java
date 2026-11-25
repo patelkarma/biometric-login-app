@@ -1,5 +1,6 @@
 package com.biometric.backend.model;
 
+import com.biometric.backend.util.Identifiers;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -53,6 +54,15 @@ public class User {
 
     public String getIdentifier() {
         return email != null ? email : phone;
+    }
+
+    /** Stores a normalised identifier in the email or phone column, whichever it is. */
+    public void setIdentifier(String identifier) {
+        if (Identifiers.isPhone(identifier)) {
+            this.phone = identifier;
+        } else {
+            this.email = identifier;
+        }
     }
 
     public ContactType getContactType() {

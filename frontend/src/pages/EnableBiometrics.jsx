@@ -1,11 +1,13 @@
-import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { FaceIdIcon, FingerprintIcon } from '../components/Icons'
+import { Alert, Button } from '../components/ui'
 import { useAuth } from '../context/useAuth'
+import { useAsyncAction } from '../hooks/useAsyncAction'
 import { enableBiometrics } from '../lib/biometrics'
-import { getBiometricName, getPlatform } from '../lib/device'
+import { getBiometricName, getPlatform, isMobileDevice } from '../lib/device'
 
+// The biometric options shown in the green panel; the one matching this device is highlighted.
 const TYPES = [
   { name: 'Face ID', where: 'iPhone · iPad', platforms: ['iPhone', 'iPad'] },
   { name: 'Touch ID', where: 'Mac', platforms: ['Mac'] },
@@ -17,24 +19,17 @@ export default function EnableBiometrics() {
   const navigate = useNavigate()
   const location = useLocation()
   const { refresh } = useAuth()
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
+  const { busy, error, run } = useAsyncAction()
   const state = location.state ?? {}
   const platform = getPlatform()
-  const isPhone = ['iPhone', 'iPad', 'Android'].includes(platform)
+  const isPhone = isMobileDevice(platform)
 
-  async function enable() {
-    setBusy(true)
-    setError(null)
-    try {
+  function enable() {
+    run(async () => {
       await enableBiometrics()
       await refresh()
       navigate('/dashboard', { replace: true, state: { ...state, biometricsEnabled: true } })
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
   return (
@@ -73,24 +68,20 @@ export default function EnableBiometrics() {
           </p>
         </header>
 
-        {error && (
-          <div className="alert alert--error" role="alert">
-            {error}
-          </div>
-        )}
+        <Alert>{error}</Alert>
 
         <div className="actions">
-          <button className="btn btn--primary btn--block" onClick={enable} disabled={busy}>
-            {busy && <span className="spinner" />}
+          <Button block loading={busy} onClick={enable} disabled={busy}>
             {isPhone ? 'Enable Face ID' : 'Enable biometrics'}
-          </button>
-          <button
-            className="btn btn--outline btn--block"
+          </Button>
+          <Button
+            variant="outline"
+            block
             onClick={() => navigate('/dashboard', { replace: true, state })}
             disabled={busy}
           >
             Skip for now
-          </button>
+          </Button>
         </div>
       </div>
     </AuthLayout>

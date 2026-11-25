@@ -1,33 +1,20 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import Logo from '../components/Logo'
 import { DeviceIcon, FaceIdIcon, FingerprintIcon, PhoneIcon, PlusIcon, TrashIcon } from '../components/Icons'
+import Logo from '../components/Logo'
+import { Alert, Button } from '../components/ui'
 import { useAuth } from '../context/useAuth'
+import { useAsyncAction } from '../hooks/useAsyncAction'
 import { api } from '../lib/api'
 import { enableBiometrics, isBiometricSupported } from '../lib/biometrics'
-
-const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
-const dayTimeFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-
-function formatDob(iso) {
-  const [y, m, d] = iso.split('-').map(Number)
-  return dateFmt.format(new Date(y, m - 1, d))
-}
-
-function formatPhone(p) {
-  return p.startsWith('+91') ? `+91 ${p.slice(3, 8)} ${p.slice(8)}` : p
-}
-
-function isMobileName(name) {
-  return /iPhone|iPad|Android/.test(name)
-}
+import { isMobileDevice } from '../lib/device'
+import { formatDateTime, formatDob, formatPhone, formatTime } from '../lib/format'
 
 export default function Dashboard() {
   const { me, logout, refresh } = useAuth()
   const location = useLocation()
-  const [bioError, setBioError] = useState(null)
-  const [bioBusy, setBioBusy] = useState(false)
+  // busy: false | true (adding a biometric) | 'remove'. Only adding shows the spinner, as before.
+  const { busy, error: bioError, run } = useAsyncAction()
   const [banner, setBanner] = useState(() => {
     if (location.state?.biometricsEnabled) return 'Biometric sign-in is now enabled on this device.'
     if (location.state?.replacedOtherDevice) return 'You were signed out of your other device. Only this device is active now.'
@@ -45,28 +32,22 @@ export default function Dashboard() {
   const { user, session, passkeys } = me
   const contact = user.email ?? formatPhone(user.phone)
 
-  async function addPasskey() {
-    setBioBusy(true)
-    setBioError(null)
-    try {
+  function addPasskey() {
+    run(async () => {
       await enableBiometrics()
       await refresh()
       setBanner('Biometric sign-in is now enabled on this device.')
-    } catch (err) {
-      setBioError(err.message)
-    } finally {
-      setBioBusy(false)
-    }
+    })
   }
 
-  async function removePasskey(id) {
-    setBioError(null)
-    try {
-      await api(`/passkeys/${id}`, { method: 'DELETE' })
-      await refresh()
-    } catch (err) {
-      setBioError(err.message)
-    }
+  function removePasskey(id) {
+    run(
+      async () => {
+        await api(`/passkeys/${id}`, { method: 'DELETE' })
+        await refresh()
+      },
+      { busyKey: 'remove' },
+    )
   }
 
   return (
@@ -89,12 +70,12 @@ export default function Dashboard() {
 
       <main className="dash">
         {banner && (
-          <div className="alert alert--success dash__banner">
+          <Alert type="success" className="dash__banner">
             <span>{banner}</span>
             <button className="link" onClick={() => setBanner(null)} aria-label="Dismiss">
               ✕
             </button>
-          </div>
+          </Alert>
         )}
 
         <section id="overview" className="tile tile--hero">
@@ -119,7 +100,7 @@ export default function Dashboard() {
             <h2 className="tile__title">Active device</h2>
             <div className="device-row">
               <span className="device-row__icon">
-                {isMobileName(session.deviceName) ? (
+                {isMobileDevice(session.deviceName) ? (
                   <PhoneIcon width={20} height={20} />
                 ) : (
                   <DeviceIcon width={20} height={20} />
@@ -128,7 +109,7 @@ export default function Dashboard() {
               <div>
                 <strong>{session.deviceName}</strong>
                 <span>
-                  This device · since {timeFmt.format(new Date(session.signedInAt))} ·{' '}
+                  This device · since {formatTime(session.signedInAt)} ·{' '}
                   {session.loginMethod === 'BIOMETRIC' ? 'biometrics' : '6-digit code'}
                 </span>
               </div>
@@ -142,9 +123,15 @@ export default function Dashboard() {
             <div className="tile__head">
               <h2 className="tile__title">Biometric logins</h2>
               {isBiometricSupported() && (
-                <button className="btn btn--primary btn--sm" onClick={addPasskey} disabled={bioBusy}>
-                  {bioBusy ? <span className="spinner" /> : <PlusIcon width={16} height={16} />} Add
-                </button>
+                <Button
+                  size="sm"
+                  icon={<PlusIcon width={16} height={16} />}
+                  loading={busy === true}
+                  onClick={addPasskey}
+                  disabled={busy === true}
+                >
+                  Add
+                </Button>
               )}
             </div>
 
@@ -161,8 +148,8 @@ export default function Dashboard() {
                     <div>
                       <strong>{p.deviceName}</strong>
                       <span>
-                        Added {dayTimeFmt.format(new Date(p.createdAt))}
-                        {p.lastUsedAt && ` · used ${dayTimeFmt.format(new Date(p.lastUsedAt))}`}
+                        Added {formatDateTime(p.createdAt)}
+                        {p.lastUsedAt && ` · used ${formatDateTime(p.lastUsedAt)}`}
                       </span>
                     </div>
                     <button
@@ -176,7 +163,7 @@ export default function Dashboard() {
                 ))}
               </ul>
             )}
-            {bioError && <div className="alert alert--error">{bioError}</div>}
+            <Alert>{bioError}</Alert>
           </section>
         </div>
       </main>

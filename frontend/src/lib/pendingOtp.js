@@ -1,4 +1,5 @@
-// Keeps "which email/phone are we verifying" across a page refresh on /verify.
+// Remembers which email/phone is being verified, so /verify survives a page refresh.
+// Kept in sessionStorage: it disappears when the tab is closed.
 const KEY = 'secureid.pendingOtp'
 
 export function savePendingOtp(data) {

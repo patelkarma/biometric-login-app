@@ -2,32 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { ArrowLeftIcon } from '../components/Icons'
+import { Alert, Button } from '../components/ui'
 import { useAuth } from '../context/useAuth'
+import { useAsyncAction } from '../hooks/useAsyncAction'
 import { api } from '../lib/api'
 import { isBiometricSupported } from '../lib/biometrics'
 import { getDeviceId, getDeviceName } from '../lib/device'
-import { clearPendingOtp, loadPendingOtp, savePendingOtp } from './verifyState'
+import { formatCountdown } from '../lib/format'
+import { clearPendingOtp, loadPendingOtp, savePendingOtp } from '../lib/pendingOtp'
 
 const LENGTH = 6
+const emptyDigits = () => Array(LENGTH).fill('')
 
+/** Seconds remaining of a `total`-second window that started when the code was sent. */
 function secondsLeft(pending, total, now) {
-  if (!pending) return 0
   const elapsed = Math.floor((now - pending.sentAt) / 1000)
   return Math.max(0, total - elapsed)
-}
-
-function mmss(seconds) {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
 export default function VerifyCode() {
   const navigate = useNavigate()
   const { completeLogin } = useAuth()
   const [pending, setPending] = useState(() => loadPendingOtp())
-  const [digits, setDigits] = useState(Array(LENGTH).fill(''))
-  const [error, setError] = useState(null)
+  const [digits, setDigits] = useState(emptyDigits)
   const [info, setInfo] = useState(null)
-  const [busy, setBusy] = useState(false)
+  // busy: false | true (verifying) | 'resend'. Only verifying locks the Verify button, as before.
+  const { busy, error, setError, run } = useAsyncAction()
+  const verifying = busy === true
   const [now, setNow] = useState(() => Date.now())
   const inputs = useRef([])
 
@@ -70,40 +71,40 @@ export default function VerifyCode() {
     else if (e.key === 'ArrowRight') focus(i + 1)
   }
 
-  async function submit(value = code) {
-    if (busy) return
+  function submit(value = code) {
+    if (verifying) return
     if (value.length !== LENGTH) return setError('Enter all 6 digits.')
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await api('/auth/otp/verify', {
-        method: 'POST',
-        body: {
-          contactType: pending.contactType,
-          contact: pending.contact,
-          code: value,
-          deviceId: getDeviceId(),
-          deviceName: getDeviceName(),
+    run(
+      async () => {
+        const res = await api('/auth/otp/verify', {
+          method: 'POST',
+          body: {
+            contactType: pending.contactType,
+            contact: pending.contact,
+            code: value,
+            deviceId: getDeviceId(),
+            deviceName: getDeviceName(),
+          },
+        })
+        clearPendingOtp()
+        completeLogin(res)
+        // New users (or anyone without biometrics yet) are offered Face ID / fingerprint first.
+        const state = { replacedOtherDevice: res.replacedOtherDevice, flow: pending.flow }
+        const next = !res.hasPasskey && isBiometricSupported() ? '/enable-biometrics' : '/dashboard'
+        navigate(next, { replace: true, state })
+      },
+      {
+        onError: () => {
+          setDigits(emptyDigits())
+          focus(0)
         },
-      })
-      clearPendingOtp()
-      completeLogin(res)
-      const state = { replacedOtherDevice: res.replacedOtherDevice, flow: pending.flow }
-      if (!res.hasPasskey && isBiometricSupported()) navigate('/enable-biometrics', { replace: true, state })
-      else navigate('/dashboard', { replace: true, state })
-    } catch (err) {
-      setError(err.message)
-      setDigits(Array(LENGTH).fill(''))
-      focus(0)
-    } finally {
-      setBusy(false)
-    }
+      },
+    )
   }
 
-  async function resend() {
-    setError(null)
+  function resend() {
     setInfo(null)
-    try {
+    run(async () => {
       const res = await api('/auth/otp/request', {
         method: 'POST',
         body: { contactType: pending.contactType, contact: pending.contact },
@@ -112,12 +113,10 @@ export default function VerifyCode() {
       savePendingOtp(next)
       setPending(next)
       setNow(Date.now())
-      setDigits(Array(LENGTH).fill(''))
+      setDigits(emptyDigits())
       setInfo('A new code has been sent.')
       focus(0)
-    } catch (err) {
-      setError(err.message)
-    }
+    }, { busyKey: 'resend' })
   }
 
   return (
@@ -197,23 +196,18 @@ export default function VerifyCode() {
           ))}
         </div>
 
-        {error && (
-          <div className="alert alert--error" role="alert">
-            {error}
-          </div>
-        )}
-        {info && <div className="alert alert--success">{info}</div>}
+        <Alert>{error}</Alert>
+        <Alert type="success">{info}</Alert>
 
-        <button className="btn btn--primary btn--block" disabled={busy || code.length !== LENGTH}>
-          {busy && <span className="spinner" />}
+        <Button block loading={verifying} disabled={verifying || code.length !== LENGTH}>
           Verify
-        </button>
+        </Button>
       </form>
 
       <div className="meta-row">
-        <span>{expiresIn > 0 ? `Expires in ${mmss(expiresIn)}` : 'Code expired'}</span>
+        <span>{expiresIn > 0 ? `Expires in ${formatCountdown(expiresIn)}` : 'Code expired'}</span>
         {resendIn > 0 ? (
-          <span>Resend in {mmss(resendIn)}</span>
+          <span>Resend in {formatCountdown(resendIn)}</span>
         ) : (
           <button type="button" className="link" onClick={resend}>
             Resend code

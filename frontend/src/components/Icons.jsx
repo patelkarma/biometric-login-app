@@ -39,13 +39,6 @@ export const FingerprintIcon = (p) => (
   </svg>
 )
 
-export const MailIcon = (p) => (
-  <svg {...base} {...p}>
-    <rect x="3" y="5" width="18" height="14" rx="2" />
-    <path d="m3 7 9 6 9-6" />
-  </svg>
-)
-
 export const PhoneIcon = (p) => (
   <svg {...base} {...p}>
     <rect x="6" y="2" width="12" height="20" rx="2.5" />
@@ -72,13 +65,6 @@ export const LogoutIcon = (p) => (
   </svg>
 )
 
-export const AlertIcon = (p) => (
-  <svg {...base} {...p}>
-    <path d="M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z" />
-    <path d="M12 9v4M12 17h.01" />
-  </svg>
-)
-
 export const TrashIcon = (p) => (
   <svg {...base} {...p}>
     <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
@@ -88,20 +74,6 @@ export const TrashIcon = (p) => (
 export const PlusIcon = (p) => (
   <svg {...base} {...p}>
     <path d="M12 5v14M5 12h14" />
-  </svg>
-)
-
-export const UserIcon = (p) => (
-  <svg {...base} {...p}>
-    <circle cx="12" cy="8" r="4" />
-    <path d="M4 21a8 8 0 0 1 16 0" />
-  </svg>
-)
-
-export const LockIcon = (p) => (
-  <svg {...base} {...p}>
-    <rect x="4" y="11" width="16" height="10" rx="2" />
-    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
   </svg>
 )
 

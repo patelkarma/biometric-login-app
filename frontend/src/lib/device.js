@@ -28,6 +28,14 @@ export function getPlatform() {
   return 'Unknown OS'
 }
 
+/**
+ * True for phones and tablets. Accepts a platform ("iPhone") or a device name
+ * ("Safari on iPhone"); defaults to this browser's platform.
+ */
+export function isMobileDevice(platformOrName = getPlatform()) {
+  return /iPhone|iPad|Android/.test(platformOrName)
+}
+
 function getBrowser() {
   const ua = navigator.userAgent
   if (/Edg\//.test(ua)) return 'Edge'

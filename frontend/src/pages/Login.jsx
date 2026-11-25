@@ -3,61 +3,57 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import ContactInput from '../components/ContactInput'
 import { FaceIdIcon } from '../components/Icons'
+import { Alert, Button } from '../components/ui'
 import { useAuth } from '../context/useAuth'
+import { useAsyncAction } from '../hooks/useAsyncAction'
 import { api } from '../lib/api'
 import { isBiometricSupported, signInWithBiometrics } from '../lib/biometrics'
-import { buildContact, emptyContact, validateContact } from '../lib/contact'
+import { buildContact, emptyContact, hasContact } from '../lib/contact'
 import { getBiometricName } from '../lib/device'
-import { savePendingOtp } from './verifyState'
+import { savePendingOtp } from '../lib/pendingOtp'
+import { validateContact } from '../lib/validation'
 
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const { completeLogin } = useAuth()
   const [contact, setContact] = useState(emptyContact)
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(null) // 'code' | 'bio'
+  const { busy, error, setError, run } = useAsyncAction() // busy: false | 'code' | 'bio'
   const notice = location.state?.notice
   const biometricSupported = isBiometricSupported()
 
-  async function sendCode(e) {
+  function sendCode(e) {
     e.preventDefault()
     const problem = validateContact(contact)
     if (problem) return setError(problem)
-    setError(null)
-    setBusy('code')
-    try {
-      const res = await api('/auth/otp/request', {
-        method: 'POST',
-        body: { contactType: contact.type, contact: buildContact(contact) },
-      })
-      savePendingOtp({ ...res, flow: 'login' })
-      navigate('/verify')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(null)
-    }
+    run(
+      async () => {
+        const res = await api('/auth/otp/request', {
+          method: 'POST',
+          body: { contactType: contact.type, contact: buildContact(contact) },
+        })
+        savePendingOtp({ ...res, flow: 'login' })
+        navigate('/verify')
+      },
+      { busyKey: 'code' },
+    )
   }
 
-  async function biometricLogin() {
-    setError(null)
+  function biometricLogin() {
     // The email/phone is optional here: if it is empty the browser shows the saved passkeys.
-    const hasContact = contact.type === 'EMAIL' ? contact.email.trim() : contact.phone.trim()
-    if (hasContact) {
+    const typed = hasContact(contact)
+    if (typed) {
       const problem = validateContact(contact)
       if (problem) return setError(problem)
     }
-    setBusy('bio')
-    try {
-      const res = await signInWithBiometrics(contact.type, hasContact ? buildContact(contact) : null)
-      completeLogin(res)
-      navigate('/dashboard', { replace: true, state: { replacedOtherDevice: res.replacedOtherDevice } })
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(null)
-    }
+    run(
+      async () => {
+        const res = await signInWithBiometrics(contact.type, typed ? buildContact(contact) : null)
+        completeLogin(res)
+        navigate('/dashboard', { replace: true, state: { replacedOtherDevice: res.replacedOtherDevice } })
+      },
+      { busyKey: 'bio' },
+    )
   }
 
   return (
@@ -77,7 +73,7 @@ export default function Login() {
         <p>How would you like to sign in?</p>
       </header>
 
-      {notice && <div className="alert alert--info">{notice}</div>}
+      <Alert type="info">{notice}</Alert>
 
       <button
         type="button"
@@ -105,15 +101,10 @@ export default function Login() {
 
       <form onSubmit={sendCode} noValidate>
         <ContactInput value={contact} onChange={setContact} />
-        {error && (
-          <div className="alert alert--error" role="alert">
-            {error}
-          </div>
-        )}
-        <button className="btn btn--primary btn--block" disabled={!!busy}>
-          {busy === 'code' && <span className="spinner" />}
+        <Alert>{error}</Alert>
+        <Button block loading={busy === 'code'} disabled={!!busy}>
           Send code
-        </button>
+        </Button>
       </form>
 
       <p className="switch">

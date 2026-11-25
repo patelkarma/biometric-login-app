@@ -4,6 +4,7 @@ import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -13,6 +14,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
+import javax.sql.DataSource;
 import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
 import java.net.URI;
@@ -50,6 +52,9 @@ class AuthFlowIntegrationTests {
 
     @LocalServerPort
     int port;
+
+    @Autowired
+    DataSource dataSource;
 
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper json = JsonMapper.builder().build();
@@ -326,6 +331,25 @@ class AuthFlowIntegrationTests {
 
         // A normal later login never asks again.
         assertThat(loginWithCode(log, "PHONE", phone2, "d").body.get("possibleDuplicate").asBoolean()).isFalse();
+    }
+
+    /**
+     * Enum fields must be stored as plain text. A native database ENUM type only accepts the values
+     * that existed when the table was created, so new values (CONTACT, LINK) broke older databases.
+     */
+    @Test
+    void enumColumnsAreStoredAsText() throws Exception {
+        try (var conn = dataSource.getConnection();
+             var rs = conn.createStatement().executeQuery(
+                     "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
+                             + "WHERE COLUMN_NAME IN ('PURPOSE', 'REVOKE_REASON')")) {
+            int checked = 0;
+            while (rs.next()) {
+                assertThat(rs.getString("DATA_TYPE")).as(rs.getString("COLUMN_NAME")).isEqualTo("CHARACTER VARYING");
+                checked++;
+            }
+            assertThat(checked).isEqualTo(2);
+        }
     }
 
     // ------------------------------------------------------------------ flow helpers

@@ -1,6 +1,8 @@
 package com.biometric.backend.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -55,7 +57,10 @@ public class DeviceSession {
 
     private Instant revokedAt;
 
+    // Stored as plain text (VARCHAR), not a database ENUM type: adding a new value then needs
+    // no database change. (A native ENUM column rejected new values in existing databases.)
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 20)
     private RevokeReason revokeReason;
 

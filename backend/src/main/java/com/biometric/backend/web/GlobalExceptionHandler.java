@@ -43,9 +43,16 @@ public class GlobalExceptionHandler {
                 "This code was just used. Please request a new one."));
     }
 
+    /**
+     * The database refused a change (e.g. a duplicate email / phone saved by two requests at once).
+     * Known cases like "account already exists" are checked earlier with their own clear messages,
+     * so this is a last resort: log the real cause and do not guess what went wrong.
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ErrorResponse> conflict(DataIntegrityViolationException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("CONFLICT", "This account already exists."));
+        log.warn("Database refused a change: {}", e.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("CONFLICT",
+                "This change conflicts with data that already exists. Please try again."));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

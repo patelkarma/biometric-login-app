@@ -1,31 +1,27 @@
 import { COUNTRY_CODES } from '../lib/contact'
-import { MailIcon, PhoneIcon } from './Icons'
 
-/** "Email | Phone" segmented tabs plus the matching input. */
-export default function ContactInput({ value, onChange, autoFocus }) {
+/** "Email | Phone" pill tabs plus the matching input. */
+export default function ContactInput({ value, onChange, autoFocus, label = 'Sign in with' }) {
   const set = (patch) => onChange({ ...value, ...patch })
 
   return (
     <div className="field">
-      <div className="tabs" role="tablist" aria-label="Sign in with">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={value.type === 'EMAIL'}
-          className={`tabs__tab ${value.type === 'EMAIL' ? 'is-active' : ''}`}
-          onClick={() => set({ type: 'EMAIL' })}
-        >
-          <MailIcon width={16} height={16} /> Email
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={value.type === 'PHONE'}
-          className={`tabs__tab ${value.type === 'PHONE' ? 'is-active' : ''}`}
-          onClick={() => set({ type: 'PHONE' })}
-        >
-          <PhoneIcon width={16} height={16} /> Phone
-        </button>
+      <div className="pills" role="tablist" aria-label={label}>
+        {[
+          ['EMAIL', 'Email'],
+          ['PHONE', 'Phone'],
+        ].map(([type, text]) => (
+          <button
+            key={type}
+            type="button"
+            role="tab"
+            aria-selected={value.type === type}
+            className={`pill ${value.type === type ? 'is-active' : ''}`}
+            onClick={() => set({ type })}
+          >
+            {text}
+          </button>
+        ))}
       </div>
 
       {value.type === 'EMAIL' ? (
@@ -52,7 +48,7 @@ export default function ContactInput({ value, onChange, autoFocus }) {
           </label>
           <select
             id="contact-cc"
-            className="input phone-row__cc"
+            className="input"
             value={value.countryCode}
             onChange={(e) => set({ countryCode: e.target.value })}
           >

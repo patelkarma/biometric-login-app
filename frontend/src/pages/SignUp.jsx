@@ -76,10 +76,19 @@ export default function SignUp() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout
+      step={1}
+      title={
+        <>
+          Join in three
+          <br />
+          easy steps.
+        </>
+      }
+    >
       <header className="form-head">
         <h2>Create your account</h2>
-        <p>It takes less than a minute. No password needed.</p>
+        <p>No password. Ever.</p>
       </header>
 
       <form onSubmit={submit} noValidate>
@@ -133,7 +142,7 @@ export default function SignUp() {
         </div>
 
         <span className="label">Sign up with</span>
-        <ContactInput value={contact} onChange={setContact} />
+        <ContactInput value={contact} onChange={setContact} label="Sign up with" />
         {errors.contact && <span className="field__error field__error--tight">{errors.contact}</span>}
 
         {serverError && (
@@ -144,7 +153,7 @@ export default function SignUp() {
 
         <button className="btn btn--primary btn--block" disabled={busy}>
           {busy && <span className="spinner" />}
-          Create account
+          Continue
         </button>
         <p className="hint">We&apos;ll send a 6-digit code to verify it&apos;s you.</p>
       </form>

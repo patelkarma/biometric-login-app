@@ -10,10 +10,14 @@ import { clearPendingOtp, loadPendingOtp, savePendingOtp } from './verifyState'
 
 const LENGTH = 6
 
-function secondsLeft(pending) {
+function secondsLeft(pending, total, now) {
   if (!pending) return 0
-  const elapsed = Math.floor((Date.now() - pending.sentAt) / 1000)
-  return Math.max(0, pending.resendInSeconds - elapsed)
+  const elapsed = Math.floor((now - pending.sentAt) / 1000)
+  return Math.max(0, total - elapsed)
+}
+
+function mmss(seconds) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
 export default function VerifyCode() {
@@ -24,18 +28,21 @@ export default function VerifyCode() {
   const [error, setError] = useState(null)
   const [info, setInfo] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [resendIn, setResendIn] = useState(() => secondsLeft(loadPendingOtp()))
+  const [now, setNow] = useState(() => Date.now())
   const inputs = useRef([])
 
+  // One clock drives both countdowns (resend cooldown and code expiry).
   useEffect(() => {
-    if (resendIn <= 0) return
-    const id = setTimeout(() => setResendIn(secondsLeft(pending)), 1000)
-    return () => clearTimeout(id)
-  }, [resendIn, pending])
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   if (!pending) return <Navigate to="/login" replace />
 
   const code = digits.join('')
+  const resendIn = secondsLeft(pending, pending.resendInSeconds, now)
+  const expiresIn = secondsLeft(pending, pending.expiresInSeconds, now)
+  const isSignup = pending.flow === 'signup'
 
   function focus(i) {
     inputs.current[Math.max(0, Math.min(LENGTH - 1, i))]?.focus()
@@ -81,7 +88,7 @@ export default function VerifyCode() {
       })
       clearPendingOtp()
       completeLogin(res)
-      const state = { replacedOtherDevice: res.replacedOtherDevice }
+      const state = { replacedOtherDevice: res.replacedOtherDevice, flow: pending.flow }
       if (!res.hasPasskey && isBiometricSupported()) navigate('/enable-biometrics', { replace: true, state })
       else navigate('/dashboard', { replace: true, state })
     } catch (err) {
@@ -104,7 +111,7 @@ export default function VerifyCode() {
       const next = { ...pending, ...res, sentAt: Date.now() }
       savePendingOtp(next)
       setPending(next)
-      setResendIn(res.resendInSeconds)
+      setNow(Date.now())
       setDigits(Array(LENGTH).fill(''))
       setInfo('A new code has been sent.')
       focus(0)
@@ -113,32 +120,42 @@ export default function VerifyCode() {
     }
   }
 
-  const mm = String(Math.floor(resendIn / 60))
-  const ss = String(resendIn % 60).padStart(2, '0')
-
   return (
-    <AuthLayout>
-      <Link to={pending.flow === 'signup' ? '/signup' : '/login'} className="back">
+    <AuthLayout
+      step={isSignup ? 2 : undefined}
+      title={
+        <>
+          Check your
+          <br />
+          messages.
+        </>
+      }
+      text={isSignup ? undefined : 'Codes expire after 5 minutes and stop working after 5 wrong tries.'}
+    >
+      <Link to={isSignup ? '/signup' : '/login'} className="back">
         <ArrowLeftIcon width={16} height={16} /> Back
       </Link>
       <header className="form-head">
-        <h2>{pending.flow === 'signup' ? 'Verify your account' : 'Enter your code'}</h2>
+        <h2>Enter your code</h2>
         <p>
-          Enter the 6-digit code sent to <strong>{pending.maskedContact}</strong>
+          Sent to <strong>{pending.maskedContact}</strong>
         </p>
       </header>
 
       {pending.demoCode && (
         <div className="demo-banner" role="status">
-          <div>
+          <span>
             <strong>Demo delivery</strong>
-            <span>
-              {pending.contactType === 'PHONE'
-                ? 'No SMS gateway is configured, so the code is shown here and in the server console.'
-                : 'No email server is configured, so the code is shown here and in the server console.'}
-            </span>
-          </div>
-          <button type="button" className="demo-banner__code" onClick={() => fill(0, pending.demoCode)} title="Click to fill">
+            {pending.contactType === 'PHONE'
+              ? 'No SMS gateway, so the code shows here and in the server console.'
+              : 'No email server, so the code shows here and in the server console.'}
+          </span>
+          <button
+            type="button"
+            className="demo-banner__code"
+            onClick={() => fill(0, pending.demoCode)}
+            aria-label={`Fill in demo code ${pending.demoCode}`}
+          >
             {pending.demoCode}
           </button>
         </div>
@@ -193,19 +210,16 @@ export default function VerifyCode() {
         </button>
       </form>
 
-      <p className="switch">
-        Didn&apos;t get it?{' '}
+      <div className="meta-row">
+        <span>{expiresIn > 0 ? `Expires in ${mmss(expiresIn)}` : 'Code expired'}</span>
         {resendIn > 0 ? (
-          <span className="muted">
-            Resend in {mm}:{ss}
-          </span>
+          <span>Resend in {mmss(resendIn)}</span>
         ) : (
           <button type="button" className="link" onClick={resend}>
             Resend code
           </button>
         )}
-      </p>
-      <p className="hint center">The code expires in 5 minutes. After 5 wrong attempts you&apos;ll need a new code.</p>
+      </div>
     </AuthLayout>
   )
 }

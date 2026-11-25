@@ -1,12 +1,12 @@
 // Email / phone helpers shared by the sign-up and login forms.
 
 export const COUNTRY_CODES = [
-  { code: '+91', label: 'IN +91' },
-  { code: '+1', label: 'US +1' },
-  { code: '+44', label: 'UK +44' },
-  { code: '+971', label: 'AE +971' },
-  { code: '+61', label: 'AU +61' },
-  { code: '+65', label: 'SG +65' },
+  { code: '+91', label: '+91' },
+  { code: '+1', label: '+1' },
+  { code: '+44', label: '+44' },
+  { code: '+971', label: '+971' },
+  { code: '+61', label: '+61' },
+  { code: '+65', label: '+65' },
 ]
 
 /** Combines country code + local number into what the API expects. */

@@ -1,24 +1,14 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import {
-  DeviceIcon,
-  FaceIdIcon,
-  FingerprintIcon,
-  LockIcon,
-  LogoutIcon,
-  MailIcon,
-  PhoneIcon,
-  PlusIcon,
-  ShieldIcon,
-  TrashIcon,
-  UserIcon,
-} from '../components/Icons'
+import Logo from '../components/Logo'
+import { DeviceIcon, FaceIdIcon, FingerprintIcon, PhoneIcon, PlusIcon, TrashIcon } from '../components/Icons'
 import { useAuth } from '../context/useAuth'
 import { api } from '../lib/api'
 import { enableBiometrics, isBiometricSupported } from '../lib/biometrics'
 
-const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
-const timeFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+const dayTimeFmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 function formatDob(iso) {
   const [y, m, d] = iso.split('-').map(Number)
@@ -27,6 +17,10 @@ function formatDob(iso) {
 
 function formatPhone(p) {
   return p.startsWith('+91') ? `+91 ${p.slice(3, 8)} ${p.slice(8)}` : p
+}
+
+function isMobileName(name) {
+  return /iPhone|iPad|Android/.test(name)
 }
 
 export default function Dashboard() {
@@ -49,6 +43,7 @@ export default function Dashboard() {
   }
 
   const { user, session, passkeys } = me
+  const contact = user.email ?? formatPhone(user.phone)
 
   async function addPasskey() {
     setBioBusy(true)
@@ -76,17 +71,21 @@ export default function Dashboard() {
 
   return (
     <div className="app">
-      <nav className="topbar">
-        <div className="topbar__brand">
-          <span className="logo-mark logo-mark--sm">
-            <ShieldIcon width={18} height={18} />
-          </span>
-          SecureID
+      <aside className="sidebar">
+        <div className="sidebar__top">
+          <Logo />
+          <nav className="sidebar__nav" aria-label="Dashboard sections">
+            <a href="#overview" className="is-active">
+              Overview
+            </a>
+            <a href="#devices">Devices</a>
+            <a href="#biometrics">Biometrics</a>
+          </nav>
         </div>
-        <button className="btn btn--ghost btn--sm" onClick={logout}>
-          <LogoutIcon width={16} height={16} /> Log out
+        <button className="sidebar__logout" onClick={logout}>
+          Log out
         </button>
-      </nav>
+      </aside>
 
       <main className="dash">
         {banner && (
@@ -98,102 +97,79 @@ export default function Dashboard() {
           </div>
         )}
 
-        <section className="card card--hero">
-          <div className="avatar">
-            {user.firstName[0]}
-            {user.surname[0]}
+        <section id="overview" className="tile tile--hero">
+          <div className="tile--hero__who">
+            <span className="avatar">
+              {user.firstName[0]}
+              {user.surname[0]}
+            </span>
+            <div>
+              <h1>Hi {user.firstName}, you&apos;re all set.</h1>
+              <p>
+                {user.firstName} {user.surname} · Born {formatDob(user.dateOfBirth)} · {contact}{' '}
+                <span className="verified">verified</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <h1>Hello, {user.firstName}!</h1>
-            <p>You&apos;re signed in securely. Here&apos;s an overview of your account.</p>
-          </div>
+          <span className="badge">● Protected</span>
         </section>
 
         <div className="dash__grid">
-          <section className="card">
-            <h3 className="card__title">
-              <UserIcon width={18} height={18} /> Profile
-            </h3>
-            <dl className="details">
-              <div>
-                <dt>First name</dt>
-                <dd>{user.firstName}</dd>
-              </div>
-              <div>
-                <dt>Surname</dt>
-                <dd>{user.surname}</dd>
-              </div>
-              <div>
-                <dt>Date of birth</dt>
-                <dd>{formatDob(user.dateOfBirth)}</dd>
-              </div>
-              <div>
-                <dt>{user.contactType === 'EMAIL' ? 'Email' : 'Phone'}</dt>
-                <dd className="details__contact">
-                  {user.contactType === 'EMAIL' ? <MailIcon width={16} height={16} /> : <PhoneIcon width={16} height={16} />}
-                  {user.email ?? formatPhone(user.phone)}
-                  <span className="badge badge--green">Verified</span>
-                </dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="card">
-            <h3 className="card__title">
-              <DeviceIcon width={18} height={18} /> Active device
-            </h3>
-            <div className="device">
-              <span className="pulse" aria-hidden="true" />
+          <section id="devices" className="tile">
+            <h2 className="tile__title">Active device</h2>
+            <div className="device-row">
+              <span className="device-row__icon">
+                {isMobileName(session.deviceName) ? (
+                  <PhoneIcon width={20} height={20} />
+                ) : (
+                  <DeviceIcon width={20} height={20} />
+                )}
+              </span>
               <div>
                 <strong>{session.deviceName}</strong>
-                <span className="muted">This device</span>
+                <span>
+                  This device · since {timeFmt.format(new Date(session.signedInAt))} ·{' '}
+                  {session.loginMethod === 'BIOMETRIC' ? 'biometrics' : '6-digit code'}
+                </span>
               </div>
             </div>
-            <dl className="details details--compact">
-              <div>
-                <dt>Signed in</dt>
-                <dd>{timeFmt.format(new Date(session.signedInAt))}</dd>
-              </div>
-              <div>
-                <dt>Method</dt>
-                <dd>{session.loginMethod === 'BIOMETRIC' ? 'Face ID / fingerprint' : '6-digit code'}</dd>
-              </div>
-            </dl>
-            <p className="note">
-              <LockIcon width={14} height={14} /> Only one device can be active at a time. Signing in somewhere else
-              will sign this device out automatically.
+            <p className="muted-text">
+              You can only be signed in on one device. A new sign-in ends this session automatically.
             </p>
           </section>
 
-          <section className="card">
-            <div className="card__head">
-              <h3 className="card__title">
-                <FingerprintIcon width={18} height={18} /> Biometric logins
-              </h3>
+          <section id="biometrics" className="tile">
+            <div className="tile__head">
+              <h2 className="tile__title">Biometric logins</h2>
               {isBiometricSupported() && (
-                <button className="btn btn--outline btn--sm" onClick={addPasskey} disabled={bioBusy}>
-                  {bioBusy ? <span className="spinner spinner--dark" /> : <PlusIcon width={16} height={16} />} Add
+                <button className="btn btn--primary btn--sm" onClick={addPasskey} disabled={bioBusy}>
+                  {bioBusy ? <span className="spinner" /> : <PlusIcon width={16} height={16} />} Add
                 </button>
               )}
             </div>
+
             {passkeys.length === 0 ? (
               <div className="empty">
-                <FaceIdIcon width={30} height={30} />
+                <FaceIdIcon width={28} height={28} />
                 <p>No biometric login yet. Add Face ID, fingerprint or Windows Hello to sign in without a code.</p>
               </div>
             ) : (
               <ul className="passkeys">
                 {passkeys.map((p) => (
                   <li key={p.id}>
-                    <FingerprintIcon width={18} height={18} />
+                    <FingerprintIcon width={22} height={22} />
                     <div>
                       <strong>{p.deviceName}</strong>
-                      <span className="muted">
-                        Added {timeFmt.format(new Date(p.createdAt))}
-                        {p.lastUsedAt && ` · Last used ${timeFmt.format(new Date(p.lastUsedAt))}`}
+                      <span>
+                        Added {dayTimeFmt.format(new Date(p.createdAt))}
+                        {p.lastUsedAt && ` · used ${dayTimeFmt.format(new Date(p.lastUsedAt))}`}
                       </span>
                     </div>
-                    <button className="icon-btn" onClick={() => removePasskey(p.id)} aria-label="Remove biometric login">
+                    <button
+                      className="icon-btn"
+                      onClick={() => removePasskey(p.id)}
+                      aria-label={`Remove biometric login for ${p.deviceName}`}
+                    >
                       <TrashIcon width={16} height={16} />
                     </button>
                   </li>
@@ -201,18 +177,6 @@ export default function Dashboard() {
               </ul>
             )}
             {bioError && <div className="alert alert--error">{bioError}</div>}
-          </section>
-
-          <section className="card">
-            <h3 className="card__title">
-              <ShieldIcon width={18} height={18} /> Security
-            </h3>
-            <ul className="checks">
-              <li>Codes expire in 5 minutes and lock after 5 wrong attempts</li>
-              <li>Codes and session tokens are stored only as SHA-256 hashes</li>
-              <li>Biometric data never leaves your device - we only keep a public key</li>
-              <li>New sign-ins automatically end sessions on other devices</li>
-            </ul>
           </section>
         </div>
       </main>

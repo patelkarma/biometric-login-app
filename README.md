@@ -62,6 +62,18 @@ cd backend  && ./mvnw spring-boot:run      # API on :8080
 cd frontend && npm install && npm run dev  # UI on http://localhost:5173 (proxies /api to :8080)
 ```
 
+Port 8080 already taken? Start the API on another port and point the UI at it:
+
+```sh
+cd backend  && ./mvnw spring-boot:run -Dspring-boot.run.arguments=--server.port=8090
+cd frontend && BACKEND_URL=http://localhost:8090 npm run dev
+```
+
+### Responsive design
+The UI ("Sage" design) is built mobile-first: above 900 px it shows a split card (green panel + form);
+below 900 px the green panel collapses into a compact header with a 3-step progress bar, fields stack,
+and all tap targets are at least 44 px. The dashboard sidebar becomes a top bar on phones.
+
 ### Tests
 
 ```sh

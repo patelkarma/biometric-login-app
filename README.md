@@ -96,7 +96,12 @@ that registers a passkey and signs in with it, so the biometric flow is verified
 - email sign-up → code → enable biometrics → biometric login on a second device → first device gets `SESSION_REVOKED` → replayed assertion rejected → logout
 - phone sign-up, duplicate account rejected
 - validation (missing surname / DOB, under-age, invalid email)
-- 5 wrong codes lock the code
+- 5 wrong codes lock the code; the same code sent by 5 devices at once signs in only one
+- codes are read from the backend log, and the API response never contains the code
+- add a phone to an email account → sign in with either → still one active device
+- a contact used by another account cannot be added, and someone else's code cannot be redeemed
+- "Is this you?": same name + date of birth → link only with a code from the existing account; different person / different birthday is not linked
+- enum columns are stored as text, so new values never need a database change
 
 ---
 

@@ -42,4 +42,12 @@ public class OtpCode {
 
     /** Set when the code is used successfully, exhausted, or superseded by a newer code. */
     private Instant consumedAt;
+
+    /**
+     * Optimistic lock: if two requests verify (or mis-guess) the same code at the same moment,
+     * only the first update commits; the other fails instead of reusing the code or losing an attempt.
+     */
+    @Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
 }

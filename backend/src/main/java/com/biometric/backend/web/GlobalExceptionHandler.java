@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -33,6 +34,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ErrorResponse> unreadable(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest().body(new ErrorResponse("BAD_REQUEST", "Some fields are missing or in the wrong format."));
+    }
+
+    /** Two requests raced on the same one-time code; the loser must not be signed in. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<ErrorResponse> raced(ObjectOptimisticLockingFailureException e) {
+        return ResponseEntity.badRequest().body(new ErrorResponse("CODE_INVALID",
+                "This code was just used. Please request a new one."));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

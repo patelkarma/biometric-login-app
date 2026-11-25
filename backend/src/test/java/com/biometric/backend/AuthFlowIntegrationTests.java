@@ -174,6 +174,33 @@ class AuthFlowIntegrationTests {
         assertThat(post("/api/auth/otp/verify", null, body.formatted(email, real)).status).isEqualTo(400);
     }
 
+    @Test
+    void sameCodeSentByFiveDevicesAtOnceSignsInOnlyOne() throws Exception {
+        String email = "race" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
+        Res signup = post("/api/auth/signup", null, """
+                {"firstName":"R","surname":"C","dateOfBirth":"1990-01-01","contactType":"EMAIL","contact":"%s"}""".formatted(email));
+        String code = signup.body.get("demoCode").asString();
+
+        int devices = 5;
+        java.util.concurrent.CyclicBarrier start = new java.util.concurrent.CyclicBarrier(devices);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(devices);
+        java.util.List<java.util.concurrent.Future<Integer>> results = new java.util.ArrayList<>();
+        for (int i = 0; i < devices; i++) {
+            String device = "device-" + i;
+            results.add(pool.submit(() -> {
+                start.await();
+                return post("/api/auth/otp/verify", null, """
+                        {"contactType":"EMAIL","contact":"%s","code":"%s","deviceId":"%s"}""".formatted(email, code, device)).status;
+            }));
+        }
+        long signedIn = 0;
+        for (var f : results) {
+            if (f.get() == 200) signedIn++;
+        }
+        pool.shutdown();
+        assertThat(signedIn).isEqualTo(1);
+    }
+
     // ------------------------------------------------------------------ http helpers
 
     record Res(int status, JsonNode body) {}

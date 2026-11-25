@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.zip
+
+# Built React app copied into Spring Boot by run.bat / run.sh
+backend/src/main/resources/static/
+
+# Local H2 database
+backend/data/

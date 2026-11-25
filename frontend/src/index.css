@@ -972,6 +972,95 @@ select.input {
   border-radius: var(--radius-pill);
 }
 
+/* Page header on Devices / Biometrics */
+.dash__head h1 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.dash__head p {
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+/* "View details →" link at the bottom of an overview tile */
+.tile__link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: auto;
+  font-size: 15px;
+}
+
+/* Label / value rows (Devices page) */
+.details {
+  display: grid;
+  margin: 0;
+}
+.details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.details > div:last-child {
+  border-bottom: 0;
+}
+.details dt {
+  color: var(--muted);
+}
+.details dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Numbered explanation steps */
+.how {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: how;
+}
+.how li {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding-left: 40px;
+  font-size: 14px;
+  line-height: 1.5;
+  counter-increment: how;
+}
+.how li::before {
+  content: counter(how);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cream);
+  background: var(--forest);
+  border-radius: 50%;
+}
+.how li span {
+  color: var(--muted);
+}
+.how--plain li::before {
+  content: '✓';
+  color: var(--success);
+  background: var(--success-bg);
+}
+
 .empty {
   display: grid;
   justify-items: center;
@@ -1114,8 +1203,31 @@ select.input {
   .sidebar .logo {
     padding: 0;
   }
+  /* Phone: logo + Log out on the top bar; the section links become a row of tabs below it. */
+  .sidebar__top {
+    display: contents;
+  }
   .sidebar__nav {
-    display: none;
+    order: 3;
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    margin-top: 10px;
+    overflow-x: auto;
+  }
+  .sidebar__nav a {
+    flex: 1;
+    min-height: 44px;
+    padding: 12px 10px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .sidebar {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .dash__head h1 {
+    font-size: 24px;
   }
   .sidebar__logout {
     min-height: 44px;

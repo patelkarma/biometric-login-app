@@ -1,6 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import DashboardLayout from './components/DashboardLayout'
 import { useAuth } from './context/useAuth'
+import Biometrics from './pages/Biometrics'
 import Dashboard from './pages/Dashboard'
+import Devices from './pages/Devices'
 import EnableBiometrics from './pages/EnableBiometrics'
 import Login from './pages/Login'
 import SignedOut from './pages/SignedOut'
@@ -31,7 +34,12 @@ export default function App() {
       <Route path="/verify" element={<VerifyCode />} />
       <Route path="/signed-out" element={<SignedOut />} />
       <Route path="/enable-biometrics" element={<RequireAuth><EnableBiometrics /></RequireAuth>} />
-      <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+      {/* Signed-in area: one layout (sidebar + navigation), three pages inside it. */}
+      <Route path="/dashboard" element={<RequireAuth><DashboardLayout /></RequireAuth>}>
+        <Route index element={<Dashboard />} />
+        <Route path="devices" element={<Devices />} />
+        <Route path="biometrics" element={<Biometrics />} />
+      </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

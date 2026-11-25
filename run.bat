@@ -26,6 +26,6 @@ echo.
 echo     When you see "Started BackendApplication", open:  http://localhost:8080
 echo     6-digit codes are shown on screen and printed in this window.
 echo.
-cd backend
-call mvnw.cmd -q spring-boot:run
+cd /d "%~dp0backend"
+call "%~dp0backend\mvnw.cmd" -q spring-boot:run
 pause

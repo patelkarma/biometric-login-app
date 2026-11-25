@@ -80,14 +80,13 @@ public class AuthService {
 
     private OtpSentResponse sendCode(User user, OtpCode.Purpose purpose) {
         String code = otpService.issue(user.getIdentifier(), purpose);
-        NotificationService.Delivery delivery =
+        NotificationService.Channel channel =
                 notifications.sendCode(user.getContactType(), user.getIdentifier(), code, user.getFirstName());
         return new OtpSentResponse(
                 user.getContactType(),
                 user.getIdentifier(),
                 Identifiers.mask(user.getIdentifier()),
-                delivery.channel().name(),
-                delivery.demoCode(),
+                channel.name(),
                 otpService.ttlSeconds(),
                 otpService.resendCooldownSeconds());
     }

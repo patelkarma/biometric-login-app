@@ -73,8 +73,8 @@ public final class Dtos {
             ContactType contactType,
             String contact,
             String maskedContact,
+            /** EMAIL, or CONSOLE when the code was printed in the backend log. */
             String deliveryChannel,
-            String demoCode,
             long expiresInSeconds,
             long resendInSeconds
     ) {}

@@ -689,21 +689,14 @@ select.input {
 }
 .demo-banner strong {
   display: block;
+  margin-bottom: 2px;
 }
-.demo-banner__code {
-  flex: none;
-  height: 44px;
-  padding: 0 14px;
-  font: inherit;
-  font-size: 18px;
+.demo-banner code {
+  padding: 1px 6px;
+  font-size: 12px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.16em;
-  color: var(--gold-ink);
   background: var(--white);
-  border: 0;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
+  border-radius: 6px;
 }
 
 /* 6-digit boxes */

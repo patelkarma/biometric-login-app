@@ -15,30 +15,31 @@ import org.springframework.stereotype.Service;
  * Delivers 6-digit codes.
  * EMAIL: a real email through SMTP when MAIL_USERNAME / MAIL_PASSWORD are configured.
  * Otherwise (and always for PHONE, since real SMS needs a paid, DLT-registered gateway)
- * the code is printed to the console and returned to the UI as a clearly labelled demo delivery.
+ * the code is printed in the backend log for the developer testing the app.
+ * The code itself is never sent back to the browser: only the person who owns the
+ * email / phone (or, in local testing, the developer reading the log) should see it.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
-    public enum Channel { EMAIL, DEMO }
-
-    public record Delivery(Channel channel, String demoCode) {}
+    /** Where the code went: a real email, or the backend console (log). */
+    public enum Channel { EMAIL, CONSOLE }
 
     private final ObjectProvider<JavaMailSender> mailSender;
 
     @Value("${spring.mail.username:}")
     private String mailFrom;
 
-    public Delivery sendCode(ContactType type, String identifier, String code, String firstName) {
+    public Channel sendCode(ContactType type, String identifier, String code, String firstName) {
         if (type == ContactType.EMAIL && isEmailConfigured()) {
             try {
                 sendEmail(identifier, code, firstName);
                 log.info("Sent 6-digit code by email to {}", Identifiers.mask(identifier));
-                return new Delivery(Channel.EMAIL, null);
+                return Channel.EMAIL;
             } catch (Exception e) {
-                log.warn("Email delivery failed ({}), falling back to demo delivery", e.getMessage());
+                log.warn("Email delivery failed ({}), printing the code in this log instead", e.getMessage());
             }
         }
         log.info("\n==================================================\n"
@@ -47,7 +48,7 @@ public class NotificationService {
                         + "  Code: {}\n"
                         + "==================================================",
                 type == ContactType.EMAIL ? "SMTP" : "SMS gateway", identifier, code);
-        return new Delivery(Channel.DEMO, code);
+        return Channel.CONSOLE;
     }
 
     public boolean isEmailConfigured() {

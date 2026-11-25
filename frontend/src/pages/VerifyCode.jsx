@@ -141,22 +141,14 @@ export default function VerifyCode() {
         </p>
       </header>
 
-      {pending.demoCode && (
+      {/* Local testing without email/SMS: the backend prints the code in its log (never sent to the browser). */}
+      {pending.deliveryChannel === 'CONSOLE' && (
         <div className="demo-banner" role="status">
           <span>
-            <strong>Demo delivery</strong>
-            {pending.contactType === 'PHONE'
-              ? 'No SMS gateway, so the code shows here and in the server console.'
-              : 'No email server, so the code shows here and in the server console.'}
+            <strong>Check the backend logs for your code</strong>
+            {pending.contactType === 'PHONE' ? 'No SMS gateway is configured' : 'No email server is configured'}, so the
+            6-digit code is printed in the backend terminal. Look for the <code>DEMO DELIVERY</code> block.
           </span>
-          <button
-            type="button"
-            className="demo-banner__code"
-            onClick={() => fill(0, pending.demoCode)}
-            aria-label={`Fill in demo code ${pending.demoCode}`}
-          >
-            {pending.demoCode}
-          </button>
         </div>
       )}
 

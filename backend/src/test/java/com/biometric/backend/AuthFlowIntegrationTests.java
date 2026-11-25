@@ -3,7 +3,10 @@ package com.biometric.backend;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.JsonNode;
@@ -23,6 +26,8 @@ import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * using a software authenticator, and the one-active-device rule.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ExtendWith(OutputCaptureExtension.class)
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:authflow;DB_CLOSE_DELAY=-1",
         "spring.jpa.hibernate.ddl-auto=create-drop",
@@ -51,7 +57,7 @@ class AuthFlowIntegrationTests {
     // ------------------------------------------------------------------ tests
 
     @Test
-    void emailSignupCodeLoginBiometricLoginAndOneActiveDevice() throws Exception {
+    void emailSignupCodeLoginBiometricLoginAndOneActiveDevice(CapturedOutput log) throws Exception {
         String email = "user" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
 
         // 1. Sign up with email, surname and DOB -> a 6-digit code is issued
@@ -59,7 +65,11 @@ class AuthFlowIntegrationTests {
                 {"firstName":"Karma","surname":"Patel","dateOfBirth":"2001-04-12","contactType":"EMAIL","contact":"%s"}
                 """.formatted(email));
         assertThat(signup.status).isEqualTo(201);
-        String code = signup.body.get("demoCode").asString();
+        // The code is never sent to the browser - it is only printed in the backend log.
+        assertThat(signup.body.has("demoCode")).isFalse();
+        assertThat(signup.body.get("deliveryChannel").asString()).isEqualTo("CONSOLE");
+        assertThat(signup.body.toString()).doesNotContain(codeFromLog(log, email));
+        String code = codeFromLog(log, email);
         assertThat(code).matches("\\d{6}");
 
         // 2. Verify the code on device A
@@ -114,7 +124,7 @@ class AuthFlowIntegrationTests {
     }
 
     @Test
-    void phoneSignupWorksAndDuplicateIsRejected() throws Exception {
+    void phoneSignupWorksAndDuplicateIsRejected(CapturedOutput log) throws Exception {
         String phone = "+9198" + (10_000_000 + (int) (Math.random() * 89_999_999));
         Res signup = post("/api/auth/signup", null, """
                 {"firstName":"Asha","surname":"Rao","dateOfBirth":"1999-06-15","contactType":"PHONE","contact":"%s"}
@@ -124,7 +134,7 @@ class AuthFlowIntegrationTests {
 
         Res verify = post("/api/auth/otp/verify", null, """
                 {"contactType":"PHONE","contact":"%s","code":"%s","deviceId":"d1"}
-                """.formatted(phone, signup.body.get("demoCode").asString()));
+                """.formatted(phone, codeFromLog(log, phone)));
         assertThat(verify.status).isEqualTo(200);
         assertThat(verify.body.at("/user/phone").asString()).isEqualTo(phone);
 
@@ -155,11 +165,12 @@ class AuthFlowIntegrationTests {
     }
 
     @Test
-    void wrongCodesLockAfterFiveAttempts() throws Exception {
+    void wrongCodesLockAfterFiveAttempts(CapturedOutput log) throws Exception {
         String email = "lock" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
         Res signup = post("/api/auth/signup", null, """
                 {"firstName":"L","surname":"K","dateOfBirth":"1990-01-01","contactType":"EMAIL","contact":"%s"}""".formatted(email));
-        String real = signup.body.get("demoCode").asString();
+        assertThat(signup.status).isEqualTo(201);
+        String real = codeFromLog(log, email);
         String wrong = real.equals("000000") ? "111111" : "000000";
         String body = """
                 {"contactType":"EMAIL","contact":"%s","code":"%s","deviceId":"d"}""";
@@ -175,11 +186,12 @@ class AuthFlowIntegrationTests {
     }
 
     @Test
-    void sameCodeSentByFiveDevicesAtOnceSignsInOnlyOne() throws Exception {
+    void sameCodeSentByFiveDevicesAtOnceSignsInOnlyOne(CapturedOutput log) throws Exception {
         String email = "race" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
         Res signup = post("/api/auth/signup", null, """
                 {"firstName":"R","surname":"C","dateOfBirth":"1990-01-01","contactType":"EMAIL","contact":"%s"}""".formatted(email));
-        String code = signup.body.get("demoCode").asString();
+        assertThat(signup.status).isEqualTo(201);
+        String code = codeFromLog(log, email);
 
         int devices = 5;
         java.util.concurrent.CyclicBarrier start = new java.util.concurrent.CyclicBarrier(devices);
@@ -199,6 +211,17 @@ class AuthFlowIntegrationTests {
         }
         pool.shutdown();
         assertThat(signedIn).isEqualTo(1);
+    }
+
+    // ------------------------------------------------------------------ log helper
+
+    /** Reads the latest 6-digit code printed for this email / phone, exactly as a developer would. */
+    private static String codeFromLog(CapturedOutput log, String identifier) {
+        Matcher m = Pattern.compile("To:\\s+" + Pattern.quote(identifier) + "\\s+Code:\\s+(\\d{6})").matcher(log.getOut());
+        String code = null;
+        while (m.find()) code = m.group(1);
+        assertThat(code).as("code for %s in the log", identifier).isNotNull();
+        return code;
     }
 
     // ------------------------------------------------------------------ http helpers

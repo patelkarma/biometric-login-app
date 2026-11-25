@@ -41,8 +41,18 @@ Then open **http://localhost:8080** once the console shows `Started BackendAppli
 
 No accounts or API keys are needed to try the app:
 
-- **Phone:** real SMS needs a paid, DLT-registered gateway, so codes are delivered in **demo mode** — shown in a yellow *Demo delivery* box on the Verify screen (click it to auto-fill) and printed in the server console.
-- **Email:** same demo mode by default. To send **real emails**, set a Gmail address and a [Gmail App Password](https://myaccount.google.com/apppasswords) before starting:
+- **Phone:** real SMS needs a paid, DLT-registered gateway, so the code is **printed in the backend terminal**:
+
+  ```
+  ==================================================
+    DEMO DELIVERY (SMS gateway not configured)
+    To:   +919876543210
+    Code: 482913
+  ==================================================
+  ```
+  The Verify screen reminds you to check the backend logs. The code is never sent to the browser
+  (not even in the API response), just as a real one-time code would only reach the owner's phone.
+- **Email:** printed in the backend terminal the same way by default. To send **real emails**, set a Gmail address and a [Gmail App Password](https://myaccount.google.com/apppasswords) before starting:
 
   ```bat
   :: Windows
@@ -92,7 +102,7 @@ that registers a passkey and signs in with it, so the biometric flow is verified
 
 ## Try every feature (≈3 minutes)
 
-1. **Sign up with phone** — *Create account* → name, surname, DOB → *Phone* tab → `98765 43210` → click the demo code → you're in.
+1. **Sign up with phone** — *Create account* → name, surname, DOB → *Phone* tab → `98765 43210` → copy the code from the backend terminal → you're in.
 2. **Enable biometrics** — you are offered *Enable biometrics* right after the first login (or use *Add* on the dashboard). Approve with Face ID / Touch ID / fingerprint / Windows Hello.
 3. **Log out**, then on the login screen press **Sign in with Face ID / Fingerprint** — no email or code needed.
 4. **One active device** — keep the dashboard open, then open an **Incognito window** (or another browser — each counts as a separate device) and sign in to the same account. Within ~5 seconds the first window switches to *"You've been signed out"*, naming the new device.
@@ -159,7 +169,7 @@ backend/src/main/java/com/biometric/backend/
   web/          HTTP only: AuthController, AccountController, GlobalExceptionHandler, SpaController
   service/      business rules: AuthService (sign-up, code login), OtpService (6-digit codes),
                 SessionService (one active device), AccountService (profile, biometric list),
-                NotificationService (email / demo delivery)
+                NotificationService (email, or code printed in the log)
   webauthn/     Face ID / fingerprint: WebAuthnService + JpaCredentialRepository (Yubico <-> database)
   repository/   database access (Spring Data JPA)
   model/        database entities: User, OtpCode, DeviceSession, PasskeyCredential
